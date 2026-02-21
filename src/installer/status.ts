@@ -46,9 +46,10 @@ function findRunByIdPrefix(query: string): RunInfo | undefined {
   const db = getDb();
   const trimmed = query.trim();
   if (!trimmed) return undefined;
+  const normalized = trimmed.toLowerCase();
   return db
-    .prepare("SELECT * FROM runs WHERE substr(id, 1, length(?)) = ? ORDER BY created_at DESC LIMIT 1")
-    .get(trimmed, trimmed) as RunInfo | undefined;
+    .prepare("SELECT * FROM runs WHERE substr(lower(id), 1, length(?)) = ? ORDER BY created_at DESC LIMIT 1")
+    .get(normalized, normalized) as RunInfo | undefined;
 }
 
 function isNumericRunNumberQuery(query: string): boolean {
@@ -162,7 +163,7 @@ function findRunByQuery(query: string): RunInfo | undefined {
     if (isNumericRunNumberQuery(trimmedQuery)) return undefined;
   }
 
-  let run = db.prepare("SELECT * FROM runs WHERE id = ?").get(trimmedQuery) as RunInfo | undefined;
+  let run = db.prepare("SELECT * FROM runs WHERE lower(id) = lower(?)").get(trimmedQuery) as RunInfo | undefined;
   if (!run) {
     run = findRunByIdPrefix(trimmedQuery);
   }
