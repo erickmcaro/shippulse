@@ -104,14 +104,18 @@ describe("medic reset_step remediation guards", () => {
     const db = dbMod.getDb();
     const runId = crypto.randomUUID();
     const stepId = crypto.randomUUID();
+    const storyDbId = crypto.randomUUID();
     const ts = nowIso();
 
     db.prepare(
       "INSERT INTO runs (id, workflow_id, task, status, context, created_at, updated_at) VALUES (?, 'wf', 'task', 'running', '{}', ?, ?)"
     ).run(runId, ts, ts);
     db.prepare(
-      "INSERT INTO steps (id, run_id, step_id, agent_id, step_index, input_template, expects, status, abandoned_count, created_at, updated_at) VALUES (?, ?, 'impl', 'wf_dev', 0, '', '', 'running', 0, ?, ?)"
-    ).run(stepId, runId, ts, ts);
+      "INSERT INTO stories (id, run_id, story_index, story_id, title, description, acceptance_criteria, status, output, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, 0, 'S-1', 'Story 1', 'desc', '[]', 'running', 'stale story output', 0, 2, ?, ?)"
+    ).run(storyDbId, runId, ts, ts);
+    db.prepare(
+      "INSERT INTO steps (id, run_id, step_id, agent_id, step_index, input_template, expects, status, output, current_story_id, abandoned_count, created_at, updated_at) VALUES (?, ?, 'impl', 'wf_dev', 0, '', '', 'running', 'stale step output', ?, 0, ?, ?)"
+    ).run(stepId, runId, storyDbId, ts, ts);
 
     const result = await medicMod.remediateFinding({
       check: "stuck_steps",
@@ -124,13 +128,22 @@ describe("medic reset_step remediation guards", () => {
     });
     assert.equal(result, true);
 
-    const step = db.prepare("SELECT status, abandoned_count, current_story_id FROM steps WHERE id = ?").get(stepId) as {
+    const step = db.prepare("SELECT status, output, abandoned_count, current_story_id FROM steps WHERE id = ?").get(stepId) as {
       status: string;
+      output: string | null;
       abandoned_count: number;
       current_story_id: string | null;
     };
     assert.equal(step.status, "pending");
+    assert.equal(step.output, null);
     assert.equal(step.abandoned_count, 1);
     assert.equal(step.current_story_id, null);
+
+    const story = db.prepare("SELECT status, output FROM stories WHERE id = ?").get(storyDbId) as {
+      status: string;
+      output: string | null;
+    };
+    assert.equal(story.status, "pending");
+    assert.equal(story.output, null);
   });
 });

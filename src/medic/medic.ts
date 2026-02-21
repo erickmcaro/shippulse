@@ -106,11 +106,11 @@ export async function remediateFinding(finding: MedicFinding): Promise<boolean> 
 
       if (step.current_story_id) {
         db.prepare(
-          "UPDATE stories SET status = 'pending', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
+          "UPDATE stories SET status = 'pending', output = NULL, updated_at = datetime('now') WHERE id = ? AND status = 'running'"
         ).run(step.current_story_id);
       }
       const stepResult = db.prepare(
-        "UPDATE steps SET status = 'pending', abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ? AND status = 'running'"
+        "UPDATE steps SET status = 'pending', output = NULL, abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ? AND status = 'running'"
       ).run(newCount, finding.stepId);
       if (Number(stepResult.changes) !== 1) return false;
 
