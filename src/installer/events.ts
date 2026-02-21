@@ -151,8 +151,12 @@ export function getRecentEvents(limit = 50): ShipPulseEvent[] {
 export function getRunEvents(runId: string, limit = 200): ShipPulseEvent[] {
   const query = runId.trim();
   if (!query) return [];
+  const normalizedQuery = query.toLowerCase();
   const normalizedLimit = normalizeLimit(limit, 200, 5000);
   const events = readAllEvents();
-  const filtered = events.filter((evt) => evt.runId === query || evt.runId.startsWith(query));
+  const filtered = events.filter((evt) => {
+    const eventRunId = evt.runId.toLowerCase();
+    return eventRunId === normalizedQuery || eventRunId.startsWith(normalizedQuery);
+  });
   return filtered.slice(-normalizedLimit);
 }
