@@ -1,0 +1,329 @@
+# End-to-end product build flow: idea to working project.
+id: idea-to-project
+name: Idea to Project
+version: 1
+description: |
+  Turns a raw product idea into a working project with implemented stories.
+  Flow: knowledgebase scan -> architecture + epics/features/stories -> scaffold ->
+  story-by-story implementation -> verification -> integration testing -> handoff.
+
+polling:
+  model: default
+  timeoutSeconds: 240
+
+agents:
+  - id: planner
+    name: Product Planner
+    role: analysis
+    description: Converts idea into architecture, epics, features, and executable stories.
+    workspace:
+      baseDir: agents/planner
+      files:
+        AGENTS.md: agents/planner/AGENTS.md
+        SOUL.md: agents/planner/SOUL.md
+        IDENTITY.md: agents/planner/IDENTITY.md
+
+  - id: builder
+    name: Builder
+    role: coding
+    description: Scaffolds and implements the project end-to-end.
+    workspace:
+      baseDir: agents/builder
+      files:
+        AGENTS.md: ../feature-dev/agents/developer/AGENTS.md
+        SOUL.md: ../feature-dev/agents/developer/SOUL.md
+        IDENTITY.md: ../feature-dev/agents/developer/IDENTITY.md
+
+  - id: verifier
+    name: Verifier
+    role: verification
+    description: Verifies each implemented story against acceptance criteria.
+    workspace:
+      baseDir: agents/verifier
+      skills:
+        - agent-browser
+      files:
+        AGENTS.md: ../../agents/shared/verifier/AGENTS.md
+        SOUL.md: ../../agents/shared/verifier/SOUL.md
+        IDENTITY.md: ../../agents/shared/verifier/IDENTITY.md
+
+  - id: tester
+    name: Tester
+    role: testing
+    description: Runs integration/E2E checks across the completed project.
+    workspace:
+      baseDir: agents/tester
+      files:
+        AGENTS.md: ../feature-dev/agents/tester/AGENTS.md
+        SOUL.md: ../feature-dev/agents/tester/SOUL.md
+        IDENTITY.md: ../feature-dev/agents/tester/IDENTITY.md
+
+steps:
+  - id: kb-scan
+    agent: planner
+    input: |
+      Build concise planning context from local seed knowledgebases.
+
+      IDEA:
+      {{task}}
+
+      Search this local knowledgebase path:
+      1. ./infra/seed
+
+      Priority files (if present):
+      - azure-search/domain-context.json
+      - azure-search/templates.json
+      - azure-search/golden-examples.json
+      - azure-search/feedback.json
+      - cosmos/definitions/*.md
+      - cosmos/best-practices/*.md
+      - cosmos/exemplars/*.md
+
+      Reply with:
+      STATUS: done
+      KB_CONTEXT: concise standards and constraints
+      KB_ARCH_PATTERNS: architecture + stack patterns
+      KB_EPIC_PATTERNS: epic decomposition patterns
+      KB_FEATURE_PATTERNS: feature decomposition patterns
+      KB_TEMPLATE_SNIPPETS: compact reusable structure snippets
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: ideate
+    agent: planner
+    input: |
+      Convert this idea into an executable full-project plan.
+
+      IDEA:
+      {{task}}
+
+      KNOWLEDGEBASE CONTEXT:
+      {{kb_context}}
+
+      ARCHITECTURE PATTERNS:
+      {{kb_arch_patterns}}
+
+      EPIC PATTERNS:
+      {{kb_epic_patterns}}
+
+      FEATURE PATTERNS:
+      {{kb_feature_patterns}}
+
+      TEMPLATE SNIPPETS:
+      {{kb_template_snippets}}
+
+      Requirements:
+      1. Define a realistic target stack and architecture
+      2. Produce 4-8 epics, 2-5 features per epic
+      3. Produce implementation stories executable by one builder session each
+      4. Cap stories at 20
+      5. Every story must include test criteria + "Typecheck passes" last
+      6. If no explicit repo path is provided in the idea, choose:
+         /Users/Shared/Projects/<slug-from-idea>
+      7. Branch must be: feature/initial-build
+
+      Reply with:
+      STATUS: done
+      REPO: /absolute/path/to/repo
+      BRANCH: feature/initial-build
+      TECH_STACK: concise stack summary
+      ARCHITECTURE_PLAN: concise architecture plan
+      EPICS_JSON: [ ... ]
+      FEATURES_JSON: [ ... ]
+      STORIES_JSON: [ ... ]
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: bootstrap
+    agent: builder
+    input: |
+      Bootstrap the project from the plan.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      TECH_STACK: {{tech_stack}}
+      ARCHITECTURE_PLAN: {{architecture_plan}}
+      EPICS_JSON: {{epics_json}}
+      FEATURES_JSON: {{features_json}}
+
+      Instructions:
+      1. If REPO does not exist, create it and initialize git
+      2. Ensure default branch is `main`
+      3. If starting new, create an initial scaffold using TECH_STACK
+      4. Add a README with setup/run/test instructions
+      5. Add docs/PROJECT_PLAN.md with architecture, epics, and features
+      6. Ensure .gitignore exists (include .env, *.key, *.pem, node_modules/)
+      7. Run baseline build and tests; if missing, create minimal scripts/config
+      8. Create/switch to branch {{branch}}
+      9. Commit scaffold changes if any
+
+      Reply with:
+      STATUS: done
+      BUILD_CMD: <build command>
+      TEST_CMD: <test command>
+      BASELINE: <baseline status>
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: implement
+    agent: builder
+    type: loop
+    loop:
+      over: stories
+      completion: all_done
+      fresh_session: true
+      verify_each: true
+      verify_step: verify
+    input: |
+      Implement the following story for this project build.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      BUILD_CMD: {{build_cmd}}
+      TEST_CMD: {{test_cmd}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      COMPLETED STORIES:
+      {{completed_stories}}
+
+      STORIES REMAINING: {{stories_remaining}}
+
+      VERIFY FEEDBACK (if retrying):
+      {{verify_feedback}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. Implement ONLY this story
+      2. Write tests for this story
+      3. Run build/typecheck
+      4. Run tests
+      5. Commit: feat: {{current_story_id}} - {{current_story_title}}
+      6. Append to progress-{{run_id}}.txt
+
+      Reply with:
+      STATUS: done
+      CHANGES: what you implemented
+      TESTS: what tests you wrote
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: verify
+    agent: verifier
+    input: |
+      Verify the builder's work for this story.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      TEST_CMD: {{test_cmd}}
+      CHANGES: {{changes}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Check:
+      1. Code exists and is complete
+      2. Story acceptance criteria are met
+      3. Story tests exist and pass via {{test_cmd}}
+      4. Typecheck/build passes
+      5. No obvious incomplete work
+
+      Has frontend changes: {{has_frontend_changes}}
+      If true, use agent-browser for visual verification.
+
+      Reply with:
+      STATUS: done
+      VERIFIED: what you confirmed
+
+      Or if incomplete:
+      STATUS: retry
+      ISSUES:
+      - what's missing
+    expects: "STATUS: done"
+    on_fail:
+      retry_step: implement
+      max_retries: 2
+      on_exhausted:
+        escalate_to: human
+
+  - id: test
+    agent: tester
+    input: |
+      Run final integration and end-to-end checks for the completed project.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      BUILD_CMD: {{build_cmd}}
+      TEST_CMD: {{test_cmd}}
+      CHANGES: {{changes}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Reply with:
+      STATUS: done
+      RESULTS: integration/e2e outcomes
+
+      Or if issues found:
+      STATUS: retry
+      FAILURES:
+      - specific issue
+    expects: "STATUS: done"
+    on_fail:
+      retry_step: implement
+      max_retries: 2
+      on_exhausted:
+        escalate_to: human
+
+  - id: handoff
+    agent: planner
+    input: |
+      Produce final project handoff summary.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      TECH_STACK: {{tech_stack}}
+      ARCHITECTURE_PLAN: {{architecture_plan}}
+      EPICS_JSON: {{epics_json}}
+      FEATURES_JSON: {{features_json}}
+      RESULTS: {{results}}
+      PROGRESS LOG:
+      {{progress}}
+
+      Reply with:
+      STATUS: done
+      PROJECT_SUMMARY: concise what-was-built summary
+      RUN_INSTRUCTIONS: setup/run/test commands
+      NEXT_STEPS: optional enhancements or hardening tasks
+    expects: "STATUS: done"
+    on_fail:
+      escalate_to: human

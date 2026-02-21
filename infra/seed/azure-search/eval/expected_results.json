@@ -1,0 +1,267 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "created": "2025-12-02",
+    "updated": "2025-12-02",
+    "description": "Ground truth relevance judgments for APMA Planning Agent RAG evaluation",
+    "note": "Queries test generation-focused use cases (Epics, PBIs, estimates) not generic Agile knowledge",
+    "grading_scale": {
+      "3": "Highly Relevant - Directly supports the generation task",
+      "2": "Relevant - Contains useful patterns or examples",
+      "1": "Marginally Relevant - Tangential guidance",
+      "0": "Not Relevant - Does not help with the task"
+    }
+  },
+  "ground_truth": {
+    "q01": {
+      "query": "Create an Epic for implementing user authentication with SSO",
+      "agent_action": "generate_epic",
+      "relevance_judgments": {
+        "golden-epic-authentication.md": 3,
+        "epic-decomposition-playbook.md": 3,
+        "definition-of-ready.md": 2,
+        "golden-acceptance-criteria-examples.md": 2,
+        "user-story-writing-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q02": {
+      "query": "Break down this goal into user stories: Build a data export feature for compliance reporting",
+      "agent_action": "decompose_goal",
+      "relevance_judgments": {
+        "golden-epic-data-export.md": 3,
+        "epic-decomposition-playbook.md": 3,
+        "story-splitting-patterns.md": 3,
+        "vertical-slicing-guide.md": 2,
+        "user-story-writing-playbook.md": 2
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q03": {
+      "query": "Generate acceptance criteria for a REST API endpoint that returns user profile data",
+      "agent_action": "generate_acceptance_criteria",
+      "relevance_judgments": {
+        "golden-pbi-api-endpoint.md": 3,
+        "golden-acceptance-criteria-examples.md": 3,
+        "acceptance-criteria-standards.md": 3,
+        "acceptance-criteria-playbook.md": 2,
+        "definition-of-done.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q04": {
+      "query": "Estimate story points for building a React dashboard component with charts",
+      "agent_action": "estimate_story_points",
+      "relevance_judgments": {
+        "golden-pbi-ui-component.md": 3,
+        "elatta-estimation-examples.md": 3,
+        "story-point-guidelines.md": 3,
+        "estimation-techniques-playbook.md": 2,
+        "golden-technical-task-breakdown.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q05": {
+      "query": "Write a PBI for migrating the users table to add new columns for audit fields",
+      "agent_action": "generate_pbi",
+      "relevance_judgments": {
+        "golden-pbi-database-migration.md": 3,
+        "golden-acceptance-criteria-examples.md": 3,
+        "definition-of-done.md": 2,
+        "acceptance-criteria-standards.md": 2,
+        "user-story-writing-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q06": {
+      "query": "This story is too big (21 points). Help me split it into smaller deliverables",
+      "agent_action": "split_story",
+      "relevance_judgments": {
+        "story-splitting-patterns.md": 3,
+        "vertical-slicing-guide.md": 3,
+        "invest-criteria-guide.md": 3,
+        "epic-decomposition-playbook.md": 2,
+        "story-point-guidelines.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q07": {
+      "query": "Apply Definition of Ready checklist to this story before sprint planning",
+      "agent_action": "validate_dor",
+      "relevance_judgments": {
+        "definition-of-ready.md": 3,
+        "invest-criteria-guide.md": 3,
+        "backlog-refinement-playbook.md": 2,
+        "user-story-writing-playbook.md": 1,
+        "sprint-planning-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q08": {
+      "query": "Generate Definition of Done criteria for this feature before we mark it complete",
+      "agent_action": "generate_dod",
+      "relevance_judgments": {
+        "definition-of-done.md": 3,
+        "acceptance-criteria-standards.md": 2,
+        "golden-acceptance-criteria-examples.md": 2,
+        "definition-of-ready.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q09": {
+      "query": "Create a spike to research options for real-time notifications using WebSockets vs SSE",
+      "agent_action": "generate_spike",
+      "relevance_judgments": {
+        "golden-spike-template.md": 3,
+        "estimation-techniques-playbook.md": 2,
+        "story-splitting-patterns.md": 1,
+        "backlog-refinement-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q10": {
+      "query": "Estimate this Epic using the Elatta method: UI/Logic/Data/Test breakdown",
+      "agent_action": "estimate_elatta",
+      "relevance_judgments": {
+        "elatta-estimation-examples.md": 3,
+        "estimation-techniques-playbook.md": 3,
+        "story-point-guidelines.md": 2,
+        "golden-technical-task-breakdown.md": 2,
+        "golden-pbi-ui-component.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q11": {
+      "query": "Generate a bug report template for a critical production issue with user login",
+      "agent_action": "generate_bug_report",
+      "relevance_judgments": {
+        "golden-bug-report-template.md": 3,
+        "priority-classification.md": 2,
+        "acceptance-criteria-standards.md": 1,
+        "definition-of-done.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q12": {
+      "query": "Create 3-5 user stories for an Epic about implementing search functionality",
+      "agent_action": "generate_stories",
+      "relevance_judgments": {
+        "epic-decomposition-playbook.md": 3,
+        "user-story-writing-playbook.md": 3,
+        "golden-epic-authentication.md": 2,
+        "golden-epic-data-export.md": 2,
+        "story-splitting-patterns.md": 2
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q13": {
+      "query": "Write acceptance criteria using Given-When-Then format for file upload feature",
+      "agent_action": "generate_acceptance_criteria",
+      "relevance_judgments": {
+        "acceptance-criteria-standards.md": 3,
+        "golden-acceptance-criteria-examples.md": 3,
+        "acceptance-criteria-playbook.md": 3,
+        "golden-pbi-api-endpoint.md": 1,
+        "user-story-writing-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q14": {
+      "query": "Help me write a PBI for a new UI component: sortable data table with pagination",
+      "agent_action": "generate_pbi",
+      "relevance_judgments": {
+        "golden-pbi-ui-component.md": 3,
+        "golden-acceptance-criteria-examples.md": 3,
+        "user-story-writing-playbook.md": 2,
+        "acceptance-criteria-standards.md": 2,
+        "elatta-estimation-examples.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q15": {
+      "query": "Decompose this Epic into vertical slices that deliver end-to-end value",
+      "agent_action": "decompose_vertical",
+      "relevance_judgments": {
+        "vertical-slicing-guide.md": 3,
+        "story-splitting-patterns.md": 3,
+        "epic-decomposition-playbook.md": 3,
+        "invest-criteria-guide.md": 2,
+        "golden-epic-authentication.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q16": {
+      "query": "Generate a technical task breakdown for implementing OAuth 2.0 integration",
+      "agent_action": "generate_tasks",
+      "relevance_judgments": {
+        "golden-technical-task-breakdown.md": 3,
+        "golden-pbi-api-endpoint.md": 2,
+        "elatta-estimation-examples.md": 2,
+        "estimation-techniques-playbook.md": 1,
+        "golden-pbi-database-migration.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q17": {
+      "query": "Prioritize these 5 backlog items using WSJF scoring",
+      "agent_action": "prioritize_wsjf",
+      "relevance_judgments": {
+        "priority-classification.md": 3,
+        "backlog-refinement-playbook.md": 2,
+        "estimation-techniques-playbook.md": 2,
+        "release-planning-playbook.md": 1,
+        "sprint-planning-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 2
+    },
+    "q18": {
+      "query": "Check if this user story follows INVEST criteria and suggest improvements",
+      "agent_action": "validate_invest",
+      "relevance_judgments": {
+        "invest-criteria-guide.md": 3,
+        "user-story-writing-playbook.md": 3,
+        "definition-of-ready.md": 2,
+        "story-splitting-patterns.md": 1,
+        "acceptance-criteria-standards.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q19": {
+      "query": "Create an Epic for a mobile app feature with offline sync capability",
+      "agent_action": "generate_epic",
+      "relevance_judgments": {
+        "golden-epic-data-export.md": 3,
+        "epic-decomposition-playbook.md": 3,
+        "golden-acceptance-criteria-examples.md": 2,
+        "golden-epic-authentication.md": 2,
+        "definition-of-ready.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    },
+    "q20": {
+      "query": "Generate a complete work breakdown structure for this initiative: Implement customer feedback portal",
+      "agent_action": "generate_wbs",
+      "relevance_judgments": {
+        "epic-decomposition-playbook.md": 3,
+        "story-splitting-patterns.md": 3,
+        "golden-epic-authentication.md": 2,
+        "golden-epic-data-export.md": 2,
+        "elatta-estimation-examples.md": 2,
+        "vertical-slicing-guide.md": 2,
+        "user-story-writing-playbook.md": 1
+      },
+      "min_relevant_in_top_5": 3
+    }
+  },
+  "evaluation_scripts": {
+    "precision_at_k": "def precision_at_k(retrieved, relevant, k=5): return len(set(retrieved[:k]) & set(relevant)) / k",
+    "recall_at_k": "def recall_at_k(retrieved, relevant, k=10): return len(set(retrieved[:k]) & set(relevant)) / len(relevant) if relevant else 0",
+    "mrr": "def mrr(retrieved, relevant): return 1/(next((i+1 for i,d in enumerate(retrieved) if d in relevant), float('inf')))"
+  },
+  "aggregate_targets": {
+    "mean_precision_at_5": 0.75,
+    "mean_recall_at_10": 0.80,
+    "mean_mrr": 0.70,
+    "queries_passing_threshold": "18/20 (90%)"
+  }
+}

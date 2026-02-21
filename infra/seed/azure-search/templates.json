@@ -1,0 +1,116 @@
+{
+  "value": [
+    {
+      "@search.action": "upload",
+      "id": "tmpl-epic-standard-001",
+      "name": "Epic — Business outcome + scope + risks (enterprise standard)",
+      "descriptionTemplate": "## Summary\n{{OneSentenceOutcome}}\n\n## Problem / Opportunity\n{{ProblemStatement}}\n\n## Business Value\n- {{BusinessValueBullet1}}\n- {{BusinessValueBullet2}}\n\n## Success Metrics\n- {{Metric1}}\n- {{Metric2}}\n\n## Scope (In)\n- {{InScope1}}\n- {{InScope2}}\n\n## Scope (Out)\n- {{OutOfScope1}}\n\n## Assumptions\n- {{Assumption1}}\n\n## Dependencies\n- {{Dependency1}}\n\n## Risks / Mitigations\n- Risk: {{Risk1}} → Mitigation: {{Mitigation1}}\n\n## Acceptance Criteria (High-Level)\n- Given {{Context}}, when {{Action}}, then {{Outcome}}\n\n## Observability\n- Traces: {{TraceSpans}}\n- Metrics: {{Metrics}}\n\n## Definition of Done\n- Security review complete (threat model updated)\n- Tests added (unit + integration as applicable)\n- Runbook and operational notes updated\n\n## Decomposition Guardrails\n- Target: 6–8 epics per project overview (hard cap 10). If >10, consolidate by shared KPI/persona/workflow overlap.\n- This is NOT an epic if it is a single workflow step (e.g., \"Search\", \"Login\", \"Export CSV\") or a single subsystem. Demote those to Features.\n- Platform/foundation work must be outcome-framed and bundled (max 1–2 platform epics). Do NOT create separate epics for CI/CD, logging, metrics, auth unless the scope is truly cross-cutting and outcome-owned.\n- Each epic MUST specify at least one measurable Success Metric (KPI or proxy + measurement plan). If baseline is unknown, state how it will be measured.\n- Feature budget guidance: target 2–4 Features per Epic (hard cap 5)."
+      ,
+      "workItemType": "Epic",
+      "applicableContexts": [
+        "enterprise",
+        "workflow",
+        "portal",
+        "security",
+        "observability",
+        "integration"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-feature-standard-001",
+      "name": "Feature — User value + functional + NFRs + validation",
+      "descriptionTemplate": "## Summary\n{{FeatureSummary}}\n\n## User / Stakeholder Value\n{{WhoBenefits}}\n\n## Functional Requirements\n- {{Requirement1}}\n- {{Requirement2}}\n\n## Non-Functional Requirements\n- Performance: {{PerformanceRequirement}}\n- Reliability: {{ReliabilityRequirement}}\n- Security: {{SecurityRequirement}}\n\n## Acceptance Criteria\n- Given {{Context}}, when {{Action}}, then {{Outcome}}\n\n## Data / Integration Notes\n- {{DataNotes}}\n\n## Observability\n- Logs: {{LogEvents}}\n- Metrics: {{Metrics}}\n- Traces: {{DependencySpans}}\n\n## Definition of Done\n- Feature has at least 1 acceptance criterion\n- Telemetry added and documented\n- Tests cover happy path + 1 negative case\n\n## Decomposition Guardrails\n- Target: 2–4 Features per Epic (hard cap 5). If you have more, merge overlapping features by shared user workflow and shared data entities.\n- This is NOT a Feature if it is <=5 days for one dev; demote to a PBI.\n- Promote to an Epic if it requires >=2 teams or spans multiple distinct user workflows/personas.\n- Avoid splitting by UI pages; split by user workflow stages and observable outcomes.\n- Keep Features capability-framed (\"Users can…\"), not implementation-framed (\"Implement…\")."
+      ,
+      "workItemType": "Feature",
+      "applicableContexts": [
+        "enterprise",
+        "workflow",
+        "portal",
+        "ui",
+        "api",
+        "rag"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-pbi-standard-001",
+      "name": "PBI — INVEST story + Given/When/Then AC + DoD checklist",
+      "descriptionTemplate": "As a {{Persona}}, I want {{Capability}}, so that {{Benefit}}.\n\n## Context\n{{Context}}\n\n## Acceptance Criteria (Gherkin — Given/When/Then with optional And)\n1) Given {{Given1}}, when {{When1}}, then {{Then1}}\n   And {{And1_1}} (optional)\n   And {{And1_2}} (optional)\n2) Given {{Given2}}, when {{When2}}, then {{Then2}}\n   And {{And2_1}} (optional)\n   And {{And2_2}} (optional)\n3) Given {{NegativeGiven}}, when {{NegativeWhen}}, then {{NegativeThen}} (negative/edge case required)\n   And {{NegativeAnd1}} (optional)\n\n## Notes / Constraints\n- {{Constraint1}}\n\n## Test Plan\n- Unit: {{UnitTestNotes}}\n- Integration: {{IntegrationTestNotes}}\n\n## Observability\n- Emit event: {{EventName}} (properties: {{EventProperties}})\n- Add metric: {{MetricName}} (type: {{MetricType}}; dimensions: {{MetricDimensions}})\n- Add trace span: {{SpanName}}\n\n## Definition of Done\n- Code reviewed\n- Tests added and passing\n- Telemetry added and documented\n- No secrets added; use Managed Identity / Key Vault\n- Documentation updated where applicable\n\n## Decomposition Guardrails\n- PBIs should be 1–5 days. If larger, split by independent behavior slices.\n- Target: 3–8 PBIs per Feature (hard cap 10). If over cap, merge or defer the lowest priority items."
+      ,
+      "workItemType": "ProductBacklogItem",
+      "applicableContexts": [
+        "enterprise",
+        "workflow",
+        "ui",
+        "api",
+        "quality",
+        "security",
+        "observability"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-pbi-incident-001",
+      "name": "PBI — Incident/defect response work item",
+      "descriptionTemplate": "## Incident Summary\n{{IncidentSummary}}\n\n## Impact\n- Users impacted: {{UsersImpacted}}\n- Business impact: {{BusinessImpact}}\n\n## Timeline\n- Detected: {{DetectedAt}}\n- Mitigated: {{MitigatedAt}}\n\n## Steps to Reproduce / Evidence\n{{ReproOrEvidence}}\n\n## Acceptance Criteria\n- Given the fix is deployed, when the scenario is exercised, then the issue no longer occurs\n- Given monitoring is configured, when a regression happens, then an alert triggers\n\n## Definition of Done\n- Root cause documented\n- Regression test added\n- Runbook updated\n- Post-incident follow-ups created",
+      "workItemType": "ProductBacklogItem",
+      "applicableContexts": [
+        "incident-response",
+        "reliability",
+        "operations"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-epic-compliance-001",
+      "name": "Epic — Compliance, audit, and governance delivery",
+      "descriptionTemplate": "## Summary\n{{ComplianceOutcome}}\n\n## Compliance Drivers\n- Regulation/standard: {{StandardOrPolicy}}\n- Rationale: {{Rationale}}\n\n## Scope\n- Controls to implement: {{Controls}}\n- Evidence to produce: {{EvidenceArtifacts}}\n\n## Auditability\n- What events must be logged: {{AuditEvents}}\n- Retention requirements: {{Retention}}\n\n## Acceptance Criteria (High-Level)\n- Given an audit event occurs, when the system logs it, then the record includes correlationId, actor, action, and outcome\n- Given an auditor requests evidence, when provided, then evidence is complete and verifiable\n\n## Definition of Done\n- Security/compliance review completed\n- Evidence artifacts stored and referenced\n- Runbook updated with audit procedures",
+      "workItemType": "Epic",
+      "applicableContexts": [
+        "compliance",
+        "audit",
+        "governance",
+        "regulated",
+        "gov"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-feature-integration-001",
+      "name": "Feature — External integration (DevOps/Search/Foundry)",
+      "descriptionTemplate": "## Summary\n{{IntegrationSummary}}\n\n## Integration Target\n- System: {{SystemName}}\n- API/Endpoint: {{EndpointOrSDK}}\n\n## Functional Requirements\n- Authentication method: {{AuthMethod}}\n- Operations: {{Operations}}\n- Failure behavior: {{FailureBehavior}}\n\n## Non-Functional Requirements\n- Retries/backoff: {{RetryPolicy}}\n- Timeouts: {{Timeouts}}\n- Observability: {{Telemetry}}\n\n## Acceptance Criteria\n- Given the dependency is available, when the integration runs, then it succeeds and records correlationId\n- Given the dependency returns transient errors, when retried, then it uses the agreed retry/backoff policy\n\n## Definition of Done\n- Integration tests exist (happy path + one failure path)\n- Secrets are not embedded; uses MI/Key Vault\n- Runbook includes troubleshooting steps",
+      "workItemType": "Feature",
+      "applicableContexts": [
+        "integration",
+        "azure-devops",
+        "search",
+        "foundry"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-pbi-rag-curation-001",
+      "name": "PBI — RAG content curation (golden example or domain standard)",
+      "descriptionTemplate": "As a {{Role}}, I want to add or update {{RagContentType}} content, so that the generator agents produce consistent, enterprise-ready outputs.\n\n## Content\n- Title: {{Title}}\n- Type: {{WorkItemTypeOrCategory}}\n- Rationale: {{WhyThisHelps}}\n\n## Acceptance Criteria\n- Given the content is added, when retrieval runs, then it can be found by a representative query\n- Given the content is used, when a work item is generated, then output quality improves (less rework, clearer AC/DoD)\n\n## Definition of Done\n- Content reviewed for correctness and no sensitive data\n- Seed file updated in source control\n- Verification query documented",
+      "workItemType": "ProductBacklogItem",
+      "applicableContexts": [
+        "rag",
+        "content-governance",
+        "quality"
+      ]
+    },
+    {
+      "@search.action": "upload",
+      "id": "tmpl-pbi-vertical-slice-001",
+      "name": "PBI — Vertical slice (behavior-first, testable outcome)",
+      "descriptionTemplate": "As a {{Persona}}, I want {{Capability}}, so that {{Benefit}}.\n\n## Slice Intent\n- Outcome: {{ObservableOutcome}}\n- Scope: {{InScopeBehavior}}\n- Out of scope: {{OutOfScopeBehavior}}\n\n## Acceptance Criteria (Given/When/Then)\n1) Given {{Given1}}, when {{When1}}, then {{Then1}}\n2) Given {{Given2}}, when {{When2}}, then {{Then2}}\n\n## Validation\n- Metrics/telemetry: {{MetricOrEvent}}\n- Tests: {{TestNotes}}\n\n## Definition of Done\n- Meets Definition of Ready\n- Tests added and passing\n- Telemetry added and documented\n- Documentation updated if applicable\n\n## Notes\n- Keep the slice end-to-end (UI + API + data). Avoid splitting by layer.",
+      "workItemType": "ProductBacklogItem",
+      "applicableContexts": [
+        "method",
+        "story-slicing",
+        "quality"
+      ]
+    }
+  ]
+}

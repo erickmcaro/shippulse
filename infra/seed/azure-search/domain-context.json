@@ -1,0 +1,170 @@
+{
+  "value": [
+    {
+      "@search.action": "upload",
+      "id": "ctx-architecture-001",
+      "title": "APMA Clean Architecture boundaries (non-negotiable)",
+      "content": "APMA follows Clean Architecture with exactly four projects: Api, Application, Domain, Infrastructure.\n\nRules:\n- Agent implementations live in Infrastructure (Apma.Infrastructure/Agents).\n- Agent interfaces and output models live in Application.\n- Workflows and gates are Application-layer concerns.\n- Do not create a separate Apma.Agents project.\n\nRAG guidance:\n- Do NOT implement a separate Context Retriever agent.\n- Generator agents integrate RAG via AIContextProviderFactory with TextSearchProvider.\n\nNaming and responsibilities:\n- Infrastructure integrates external services (Foundry, Search, DevOps).\n- Application orchestrates and validates; it depends on abstractions, not implementations.",
+      "category": "architecture",
+      "tags": [
+        "clean-architecture",
+        "layering",
+        "agents",
+        "rag"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-rag-001",
+      "title": "RAG quality standards for APMA outputs",
+      "content": "RAG content must help the model produce enterprise-ready work items. Prefer concise, reusable standards and high-signal examples.\n\nGolden examples should demonstrate:\n- Specific titles (no generic placeholders; avoid type prefixes like 'Epic:' or 'PBI:')\n- Descriptions with clear scope (in/out), measurable outcomes, dependencies, and risks\n- Acceptance criteria phrased in Given/When/Then\n- Definition of Done that includes tests, telemetry, security review, and documentation\n\nTemplates should provide repeatable structure and placeholders.\n\nWhen retrieval returns no results, generation must still avoid placeholder text and meet minimum quality thresholds.",
+      "category": "rag",
+      "tags": [
+        "golden-examples",
+        "templates",
+        "quality",
+        "citations"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-writing-001",
+      "title": "Work item writing standards (enterprise Agile)",
+      "content": "Title standards:\n- Use a verb + object + qualifier (e.g., 'Enable RBAC for publish operations')\n- Minimum 10 characters; avoid generic titles ('new feature', 'update')\n- Do not prefix with work item type\n\nDescription standards:\n- Minimum 50 characters with meaningful context\n- Include: Summary, Context, Scope, NFRs, Acceptance Criteria, DoD\n- Avoid placeholder text (TBD/TODO)\n\nAcceptance criteria standards:\n- Use Given/When/Then\n- Make outcomes observable and testable\n- PBIs should have 2+ criteria\n\nDefinition of Done baseline:\n- Code reviewed, tests added, telemetry added, no secrets, docs updated.",
+      "category": "standards",
+      "tags": [
+        "acceptance-criteria",
+        "dod",
+        "titles",
+        "invest"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-security-001",
+      "title": "Security baseline for APMA services",
+      "content": "Security baseline:\n- Prefer secretless authentication using Managed Identity in deployed environments\n- Store secrets (if required) in Key Vault; never hardcode in code or config\n- Apply least privilege via RBAC (scoped roles, minimal permissions)\n- Log security-relevant events (authorization failures, publish attempts, admin actions)\n\nPrivacy and data handling:\n- Do not log prompt content containing sensitive data\n- Use correlation IDs for tracing without leaking user content\n\nOperational controls:\n- Rate-limit or backoff on 429s from AI services\n- Validate inputs and sanitize outputs before persistence.",
+      "category": "security",
+      "tags": [
+        "managed-identity",
+        "key-vault",
+        "rbac",
+        "audit"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-observability-001",
+      "title": "Observability requirements for generation workflows",
+      "content": "Observability requirements:\n- Use OpenTelemetry for traces, metrics, and logs\n- Propagate a correlationId across API request, workflow steps, search retrieval, and AI invocations\n- Capture and log diagnostics when external calls fail (without secrets)\n\nRecommended telemetry:\n- Counters: generation_requests_total by workItemType and outcome\n- Histograms: generation_latency_ms by stage (retrieve, generate, validate)\n- Traces: spans for SearchAsync and agent RunAsync\n\nOperational readiness:\n- Provide a runbook for common failures (429 throttling, search outage, auth failures)",
+      "category": "observability",
+      "tags": [
+        "opentelemetry",
+        "tracing",
+        "metrics",
+        "runbook"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-gcc-high-001",
+      "title": "GCC High considerations for APMA deployments",
+      "content": "GCC High requirements:\n- Support .azure.us endpoints for Foundry project inference\n- Use AzureAuthorityHosts.AzureGovernment when IsGccHigh is true\n- Token scope differs: https://cognitiveservices.azure.us/.default\n\nConstraints:\n- Use non-hosted agents; do not use hosted/persistent agent APIs\n- Avoid hardcoded .azure.com endpoints\n\nValidation:\n- Configuration must be environment-driven (IsGccHigh flag)\n- Connectivity and auth should work with Managed Identity.",
+      "category": "compliance",
+      "tags": [
+        "gcc-high",
+        "azure-government",
+        "endpoints",
+        "auth"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-ado-001",
+      "title": "Azure DevOps publishing standards and traceability",
+      "content": "Publishing standards:\n- Always support preview before publish (diff view and hierarchy)\n- Record traceability: draftId → adoWorkItemId mapping with correlationId\n- Use least privilege identity for publish operations\n\nWork item linkage:\n- Maintain hierarchy (Epic → Feature → PBI)\n- Capture URLs/links for created items\n\nOperational guidance:\n- If publishing partially fails, produce a recovery plan listing what was created and what remains\n- Provide rollback guidance (tags, deletion strategy, or revert steps).",
+      "category": "integration",
+      "tags": [
+        "azure-devops",
+        "publishing",
+        "traceability",
+        "governance"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-testing-001",
+      "title": "Testing strategy for APMA (unit, integration, E2E)",
+      "content": "Testing strategy:\n- Unit tests validate domain behaviors, gates, and workflow decisions\n- Integration tests validate RAG retrieval integration and agent wiring (mock where needed)\n- E2E tests validate UI flow (create session → generate → review → publish preview)\n\nPrinciples:\n- Prefer deterministic tests (fixed seed data and stable fixtures)\n- Avoid network dependencies in unit tests\n- For integrations, verify graceful degradation when dependencies are down.",
+      "category": "quality",
+      "tags": [
+        "testing",
+        "unit-tests",
+        "integration-tests",
+        "e2e"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-resilience-001",
+      "title": "Resilience patterns (retries, timeouts, graceful degradation)",
+      "content": "Resilience patterns:\n- Honor Retry-After on 429 from AI services\n- Use exponential backoff with jitter and max delay\n- Use timeouts and cancellation tokens for all outbound calls\n- Degrade gracefully when context retrieval fails (generate without RAG but log warning)\n\nLogging:\n- Include dependency name, status code, retry count, and correlationId\n- Never log secrets or full prompt content.",
+      "category": "reliability",
+      "tags": [
+        "retry",
+        "backoff",
+        "timeouts",
+        "429"
+      ],
+      "createdAt": "2026-01-22T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-method-001",
+      "title": "Method: Outcome-driven planning flow (vision -> epics -> features -> PBIs)",
+      "content": "Outcome-driven planning flow:\n- Start with a clear product vision and 2-5 measurable outcomes.\n- Define Epics as outcome-sized capabilities (each should map to a success metric).\n- Define Features as user workflow capabilities that deliver the epic outcomes.\n- Define PBIs as vertical slices that are independently testable and deliver user value.\n\nGuardrails:\n- Epics must be outcome framed, not implementation tasks.\n- Features must be workflow capabilities, not single UI pages or endpoints.\n- PBIs must be small enough to complete in 1-5 days.\n- Each level should be traceable to the level above.\n\nOutputs must include:\n- Clear titles, scope, and acceptance criteria (Given/When/Then).\n- Definition of Done that includes tests, telemetry, and documentation updates.",
+      "category": "method",
+      "tags": [
+        "planning",
+        "outcomes",
+        "traceability",
+        "guardrails"
+      ],
+      "createdAt": "2026-02-03T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-method-002",
+      "title": "Definition of Ready (DoR) for work items",
+      "content": "Definition of Ready:\n- Title is clear and outcome framed.\n- Description includes context, scope in/out, and constraints.\n- Acceptance criteria are testable Given/When/Then statements.\n- Dependencies identified (if any).\n- Size is within expected bounds for the work item type.\n- Risks and assumptions are captured when relevant.\n\nDoR checks should gate generation retries when missing.",
+      "category": "method",
+      "tags": [
+        "definition-of-ready",
+        "quality",
+        "gates"
+      ],
+      "createdAt": "2026-02-03T00:00:00Z"
+    },
+    {
+      "@search.action": "upload",
+      "id": "ctx-method-003",
+      "title": "Story slicing heuristics (vertical slices)",
+      "content": "Story slicing heuristics:\n- Slice by user behavior and observable outcome, not by layers or components.\n- Prefer thin, end-to-end increments (UI + API + data) over horizontal splits.\n- Split large stories by scenario variants, data scope, or rules complexity.\n- Keep a single clear persona and benefit per story.\n\nAvoid:\n- Splitting by technical tasks (DB, API, UI separately).\n- Bundling unrelated workflows in one story.\n\nUse these heuristics when decomposing oversized items.",
+      "category": "method",
+      "tags": [
+        "story-slicing",
+        "decomposition",
+        "pbis"
+      ],
+      "createdAt": "2026-02-03T00:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,209 @@
+# Analyze an existing project and produce missing epics/features backlog.
+id: project-gap-analysis
+name: Project Gap Analysis (Missing Epics -> Features)
+version: 1
+description: |
+  Analyzes an existing repository, identifies what product capabilities are missing,
+  then outputs only missing epics and missing features by epic.
+
+polling:
+  model: default
+  timeoutSeconds: 180
+
+agents:
+  - id: repo-analyst
+    name: Repo Analyst
+    role: analysis
+    description: Maps current capabilities from an existing codebase and docs.
+    workspace:
+      baseDir: agents/repo-analyst
+      files:
+        AGENTS.md: agents/repo-analyst/AGENTS.md
+        SOUL.md: agents/repo-analyst/SOUL.md
+        IDENTITY.md: agents/repo-analyst/IDENTITY.md
+
+  - id: epic-gap-planner
+    name: Epic Gap Planner
+    role: analysis
+    description: Produces outcome-framed missing epics from current-state analysis.
+    workspace:
+      baseDir: agents/epic-gap-planner
+      files:
+        AGENTS.md: agents/epic-gap-planner/AGENTS.md
+        SOUL.md: agents/epic-gap-planner/SOUL.md
+        IDENTITY.md: agents/epic-gap-planner/IDENTITY.md
+
+  - id: feature-gap-designer
+    name: Feature Gap Designer
+    role: analysis
+    description: Expands each missing epic into independently deliverable missing features.
+    workspace:
+      baseDir: agents/feature-gap-designer
+      files:
+        AGENTS.md: agents/feature-gap-designer/AGENTS.md
+        SOUL.md: agents/feature-gap-designer/SOUL.md
+        IDENTITY.md: agents/feature-gap-designer/IDENTITY.md
+
+steps:
+  - id: repo-scan
+    agent: repo-analyst
+    input: |
+      Analyze an existing project and summarize current capability coverage.
+
+      REQUEST:
+      {{task}}
+
+      Instructions:
+      1. Determine the target repo path from REQUEST. Prefer an explicit absolute path.
+      2. If no path is explicit, infer from the request and state assumptions.
+      3. Inspect README/docs, package/build files, architecture folders, API routes, DB schema,
+         and key UI/service modules.
+      4. Infer current epics/features already implemented from concrete evidence.
+      5. Identify capability gaps relative to the requested product direction.
+      6. Do not propose implementation tasks yet; this step is current-state mapping only.
+
+      Reply with:
+      STATUS: done
+      REPO: /absolute/path/to/repo
+      PROJECT_SUMMARY: concise current-state summary
+      CURRENT_EPICS_JSON: [
+        {
+          "id": "optional",
+          "title": "Existing epic title",
+          "description": "What is already covered",
+          "evidence": ["path:file or module evidence"]
+        }
+      ]
+      CURRENT_FEATURES_JSON: [
+        {
+          "epicHint": "related existing epic",
+          "title": "Existing feature",
+          "description": "Current behavior",
+          "evidence": ["path:file or module evidence"]
+        }
+      ]
+      KNOWN_GAPS_JSON: ["missing capability", "constraint", "assumption"]
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: generate-missing-epics
+    agent: epic-gap-planner
+    input: |
+      Generate only the missing epics for this project.
+
+      REQUEST:
+      {{task}}
+
+      REPO:
+      {{repo}}
+
+      PROJECT SUMMARY:
+      {{project_summary}}
+
+      CURRENT EPICS:
+      {{current_epics_json}}
+
+      CURRENT FEATURES:
+      {{current_features_json}}
+
+      KNOWN GAPS:
+      {{known_gaps_json}}
+
+      Constraints:
+      1. Output missing epics only (do not restate existing epics)
+      2. Target 4-10 missing epics
+      3. Each missing epic must be outcome-framed and independently valuable
+      4. Each missing epic must include measurable successMetric
+      5. Include acceptanceCriteria in given/when/then format
+      6. Add whyMissing with concrete evidence from current-state analysis
+      7. Keep stable ordering: priority (P1->P4), then title (A->Z)
+
+      Reply with:
+      STATUS: done
+      MISSING_EPICS_JSON: [
+        {
+          "id": "ME-001",
+          "title": "Missing epic title",
+          "description": "Outcome and scope",
+          "acceptanceCriteria": [
+            { "given": "...", "when": "...", "then": "...", "and": ["optional"] }
+          ],
+          "priority": "P1",
+          "estimatedSize": "M",
+          "successMetric": "Measurable KPI",
+          "whyMissing": "Evidence-backed reason this capability is absent"
+        }
+      ]
+      EPIC_GAP_COVERAGE_JSON: {
+        "addressed": ["coverage now represented by missing epics"],
+        "stillUncovered": ["known gaps still not mapped"],
+        "assumptions": ["assumptions"],
+        "exclusions": ["intentionally excluded scope"]
+      }
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: generate-missing-features
+    agent: feature-gap-designer
+    input: |
+      Generate only missing features for each missing epic.
+
+      REQUEST:
+      {{task}}
+
+      REPO:
+      {{repo}}
+
+      PROJECT SUMMARY:
+      {{project_summary}}
+
+      MISSING EPICS:
+      {{missing_epics_json}}
+
+      CURRENT FEATURES:
+      {{current_features_json}}
+
+      Constraints:
+      1. Output missing features only (do not restate already implemented features)
+      2. Generate 1-5 missing features per missing epic
+      3. Every feature must be independently testable/deliverable
+      4. Include acceptanceCriteria in given/when/then format
+      5. Include whyMissing with evidence-based rationale
+      6. Keep stable ordering: epic priority, then feature priority (P1->P4), then title (A->Z)
+
+      Reply with:
+      STATUS: done
+      MISSING_FEATURES_BY_EPIC_JSON: [
+        {
+          "epicId": "ME-001",
+          "epicTitle": "Missing epic title",
+          "features": [
+            {
+              "title": "Missing feature title",
+              "description": "Feature scope",
+              "acceptanceCriteria": [
+                { "given": "...", "when": "...", "then": "...", "and": ["optional"] }
+              ],
+              "priority": "P1",
+              "estimatedSize": "M",
+              "whyMissing": "Evidence-backed reason this feature is missing"
+            }
+          ]
+        }
+      ]
+      PRIORITIZED_GAP_BACKLOG_JSON: [
+        {
+          "epicId": "ME-001",
+          "featureTitle": "Missing feature title",
+          "priority": "P1",
+          "rationale": "Why this should be implemented first"
+        }
+      ]
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human

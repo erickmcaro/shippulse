@@ -1,0 +1,184 @@
+{
+  "value": [
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-001",
+      "title": "Enable enterprise authentication, authorization, and auditability for APMA",
+      "description": "## Summary\nDeliver secure, enterprise-grade access control for APMA using Microsoft Entra ID, role-based authorization, and full audit trails across API and UI.\n\n## Business Outcomes\n- Reduce onboarding time for new teams by providing standard SSO and least-privilege roles\n- Meet enterprise security/compliance expectations (auditability, access reviews, incident readiness)\n\n## Scope (In)\n- Entra ID auth (OIDC) for UI and API\n- API authorization policies for core operations (create session, generate items, publish)\n- Audit logging for security-relevant events (auth, publish, configuration changes)\n- Secretless access patterns (Managed Identity where applicable)\n\n## Scope (Out)\n- Custom identity provider support\n- Fine-grained row-level authorization beyond project scoping\n\n## Acceptance Criteria (High-Level)\n- Given a user is authenticated via Entra ID, when they access the UI, then they can start a session without manual token handling\n- Given a user lacks the required role, when they attempt to publish work items, then the API responds with 403 and logs an authorization audit event\n- Given any publish action succeeds or fails, when the workflow completes, then an audit record is produced with correlation IDs\n\n## Definition of Done\n- Threat model updated for auth flows and token handling\n- Security logging includes correlationId, userId (or subject), action, outcome\n- Unit/integration tests cover allow/deny paths for critical endpoints\n- Documentation includes roles, permissions, and operational runbook for access issues\n\n## Observability\n- Emit trace spans for authentication, authorization, and publish operations\n- Dashboard includes auth failure rate and publish failure rate",
+      "workItemType": "Epic",
+      "feedbackScore": 4.9,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-002",
+      "title": "Establish observability, reliability, and incident readiness for APMA",
+      "description": "## Summary\nImplement an observability baseline (logs, metrics, traces) and operational practices (runbook, alerting) so APMA can be supported in production with confidence.\n\n## Business Outcomes\n- Reduce MTTR by making failures diagnosable with correlated telemetry\n- Prevent regressions by tracking latency/error budgets for core operations\n- Enable safe operations with documented incident playbooks\n\n## Success Metrics\n- 95% of generation requests have end-to-end trace coverage\n- Key operations (session creation, generation, publish) expose latency (p95) and failure rate metrics\n- On-call can identify likely root cause using a runbook within 15 minutes\n\n## Scope (In)\n- OpenTelemetry instrumentation in API + background workflows\n- Correlation IDs propagated across API, agent calls, and search calls\n- Structured logging with safe redaction and consistent fields\n- Metrics for latency, error rate, retry/backoff behavior, and dependency health\n- Alerting guidance for elevated error rates and latency regressions\n- Runbook entries for common failures (AI throttling, search unavailable, auth issues)\n\n## Scope (Out)\n- Custom APM vendor dashboards beyond baseline templates\n- Advanced anomaly detection / ML-driven alerting\n- Organization-wide SIEM integration specifics (covered by platform/security programs)\n\n## Acceptance Criteria (High-Level)\n- Given a user starts a generation run, when events stream via SSE, then logs and traces share a correlationId end-to-end\n- Given an error occurs calling an external service, when the API returns a non-200, then logs include safe diagnostics (no secrets) and a dependency span is captured\n- Given latency regresses for a core operation, when p95 exceeds the threshold, then an alert is triggered with links to traces and recent deployments\n\n## Observability\n- Traces: API request spans; dependency spans for AI/Search/DevOps; workflow stage spans\n- Metrics: request rate, error rate, p50/p95 latency, retries, 429 rate, timeouts, circuit-breaker opens\n\n## Definition of Done\n- Traces include dependency spans for Foundry and Search calls\n- Error logs are structured, searchable, and redact sensitive data\n- Runbook includes investigation steps and mitigation playbooks\n- Smoke tests verify telemetry is emitted in dev and at least one non-dev environment",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-feature-001",
+      "title": "Provide RAG-backed work item generation using curated templates and golden examples",
+      "description": "## Summary\nIntegrate Retrieval-Augmented Generation (RAG) into generator agents so they consistently produce enterprise-ready work items aligned to organizational standards.\n\n## Functional Overview\n- Generator agents retrieve context from approved sources before each invocation\n- Context includes golden examples, work item templates, and domain standards\n- Retrieved content is cited or referenced to support reviewer trust\n\n## Non-Functional Requirements\n- Retrieval must be deterministic (always executed before generation)\n- No secrets in prompts; only approved content\n- Retrieval must be scoped by work item type where relevant\n\n## Acceptance Criteria\n- Given a request to generate a Feature, when generation runs, then at least 1 template and up to 3 golden examples are retrieved when available\n- Given no relevant context is found, when generation runs, then output still meets minimum quality standards without placeholder text\n\n## Definition of Done\n- RAG integration is implemented via AIContextProviderFactory with TextSearchProvider\n- Integration test validates that search results flow into the agent invocation\n- Logging includes which sources were retrieved (IDs only, not full content)",
+      "workItemType": "Feature",
+      "feedbackScore": 4.7,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-feature-002",
+      "title": "Implement quality gates for generated work items (schema + quality warnings)",
+      "description": "## Summary\nEnsure generated work items meet schema requirements and recommended quality standards before presenting them to the user.\n\n## Scope\n- Hard gate: validates required fields and structured output schema\n- Soft gate: warns on weak titles, short descriptions, missing AC/DoD coverage\n\n## Acceptance Criteria\n- Given a generated PBI has fewer than 2 acceptance criteria, when validation runs, then a warning is recorded and shown to the user\n- Given a generated item is missing required fields, when validation runs, then the pipeline blocks and retries (once) with injected validation feedback\n\n## Definition of Done\n- Gate results persist in session state and are visible in UI\n- Unit tests cover representative failures and warning conditions\n- Gates do not modify user content; they only validate and annotate",
+      "workItemType": "Feature",
+      "feedbackScore": 4.6,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-001",
+      "title": "Wire Epic Planner agent to use RAG context with TextSearchProvider",
+      "description": "As a product manager, I want the Epic Planner agent to retrieve approved context before generating epics, so that outputs match our enterprise standards and reduce reviewer rework.\n\n### Acceptance Criteria\n- Given an epic generation request, when the agent runs, then it retrieves relevant golden examples and templates before invoking the model\n- Given retrieved items exist, when the agent returns an output, then it reflects the style and structure of the retrieved examples (clear scope, measurable outcomes)\n- Given the search service is unavailable, when generation runs, then the system degrades gracefully and logs a warning without failing the request\n\n### Definition of Done\n- Agent uses AIContextProviderFactory with TextSearchProvider in BeforeAIInvoke mode\n- Structured output schema enforcement remains enabled\n- Unit test covers search delegate invocation and fallback behavior",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.6,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-002",
+      "title": "Create Azure AI Search indexes for golden examples, templates, feedback, and domain context",
+      "description": "As a platform engineer, I want APMA to automatically create or update its Azure AI Search indexes on startup, so that environments can be provisioned consistently and RAG retrieval works without manual setup.\n\n### Acceptance Criteria\n- Given the search service exists, when the initializer runs, then required indexes are created/updated idempotently\n- Given an index already exists, when the initializer runs, then schema changes are applied safely\n- Given initialization fails, when the API starts, then the failure is observable (logs + health check details)\n\n### Definition of Done\n- Index schemas match the retrieval queries used by the application\n- Logging includes index names and operation outcomes\n- Basic smoke test verifies indexes exist after startup",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.5,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-003",
+      "title": "Enable governed publishing to Azure DevOps with preview, traceability, and rollback",
+      "description": "## Summary\nAllow users to publish generated epics/features/PBIs to Azure DevOps with safeguards: preview, approvals, traceability, and a clear rollback strategy.\n\n## Business Outcomes\n- Reduce time from idea to actionable backlog while maintaining governance\n- Improve auditability and reduce accidental changes to ADO projects\n- Increase reviewer confidence with clear diffs and publish summaries\n\n## Success Metrics\n- 100% of publish operations produce a publish summary with correlationId and created work item IDs\n- <1% of publish attempts require manual cleanup\n- Publish preview is generated in <10s for typical sessions\n\n## Scope (In)\n- Publish preview that shows diffs and hierarchy (Epic → Feature → PBI)\n- Publishing via a service identity with least privilege\n- Correlation between APMA draft IDs and ADO work item IDs\n- Idempotency and safe retry strategy (detect duplicates; avoid double-creates)\n- Rollback guidance (delete/revert tags; operational playbook)\n\n## Scope (Out)\n- Bi-directional sync (updates flowing back from ADO into APMA)\n- Complex approval workflows integrated with external GRC tooling\n- Bulk edits of existing ADO work items outside the current publish session\n\n## Acceptance Criteria (High-Level)\n- Given a user requests a publish preview, when preview is generated, then it includes work item count, hierarchy, and key field diffs\n- Given a publish operation runs, when it completes, then it records a publish summary with created IDs and correlationId\n- Given publishing fails partway, when the workflow ends, then it produces a recovery plan (what was created, what remains, and recommended cleanup)\n\n## Observability\n- Traces: publish preview, create item, link item, retry spans\n- Metrics: publish success rate, failure rate by step, retries, average publish duration\n\n## Definition of Done\n- Integration tests validate create + link operations\n- Operational runbook includes rollback guidance and common failure modes\n- Security review confirms least-privilege scopes and no PAT leakage\n- UI surfaces publish summaries and failure recovery instructions",
+      "workItemType": "Epic",
+      "feedbackScore": 4.7,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-workflow-001",
+      "title": "Reduce time-to-triage for a secure case workflow portal (queues, case summary, actions)",
+      "description": "## Summary\nDeliver a workflow-first experience that helps users quickly find the right case, understand its status and next action, and record follow-up—without exposing sensitive data unnecessarily.\n\n## Business Outcomes\n- Reduce time spent locating and interpreting case context\n- Increase throughput by standardizing triage steps and minimizing back-and-forth\n- Improve audit readiness with consistent action capture\n\n## Success Metrics\n- Reduce median time from queue open → first action recorded by 30%\n- Reduce wrong-case opens by 50% (proxy: back navigations within 15s after open)\n- Increase action completeness to >90% (cases with a disposition or follow-up note when required)\n\n## Scope (In)\n- Work queues with prioritization, filtering (status/age/owner), and safe empty/error states\n- Case summary with status, timeline, assigned owner, and next-action guidance\n- Standard actions: assign/reassign, disposition tags, add notes, request info\n- Immutable activity history surfaced in UI (audit-backed)\n\n## Scope (Out)\n- Automated decisioning / rules engines\n- Bulk administrative overrides that modify authoritative records\n\n## Acceptance Criteria (High-Level)\n- Given a user opens a queue, when they filter and select a case, then the case summary loads with clear next-action guidance\n- Given a user takes an action (assign, disposition, note), when saved, then the action is visible in the case history and reflected back in the queue\n\n## Observability\n- Metrics: time-to-first-action, wrong-case-open proxy, action completion rate\n- Traces: queue load, case load, action save\n\n## Definition of Done\n- UX flows validated with representative users\n- Key actions emit telemetry events with correlationId\n- Permission-denied and partial-data states are handled safely",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-workflow-002",
+      "title": "Enable queue-based triage with assignment, ownership, and aging controls",
+      "description": "## Summary\nProvide operational queues that let triage users prioritize work by status, age, and ownership, and perform safe assignment/routing actions with full auditability.\n\n## Business Outcomes\n- Reduce backlog aging by making ownership and priority visible\n- Improve throughput by enabling efficient queue management\n\n## Success Metrics\n- Reduce items over aging threshold by 20%\n- Increase % of queue items with clear owner to 95%\n\n## Scope (In)\n- Queue views with filters (status, age, owner, priority) and sorting\n- Assignment/reassignment actions with permission checks\n- Visual aging indicators and SLA/threshold highlighting\n- Bulk-safe operations limited to low-risk actions (e.g., assign)\n\n## Scope (Out)\n- Complex workflow engines\n- High-risk bulk updates to authoritative records\n\n## Acceptance Criteria (High-Level)\n- Given a queue is loaded, when a user filters by age and owner, then results update quickly and predictably\n- Given a user reassigns an item, when saved, then ownership updates in the queue and an audit event is recorded\n\n## Observability\n- Metrics: queue load latency, assignment success rate, aging distribution\n\n## Definition of Done\n- Queues handle empty/no-result/error states\n- Assignment actions are audited and permission-gated",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-workflow-003",
+      "title": "Provide case summary views with next-action guidance and audit-ready history",
+      "description": "## Summary\nConsolidate essential case context into a single summary view and guide users toward the next safe action, while ensuring all key interactions are auditable and least-privilege.\n\n## Business Outcomes\n- Reduce time spent assembling context across screens/tools\n- Improve follow-up consistency and audit readiness\n\n## Success Metrics\n- Reduce time-to-understand-case status by 30% (proxy: time-to-first-scroll + time-to-action)\n- Increase next-action completion rate by 25%\n\n## Scope (In)\n- Case overview: status, timeline, ownership, key flags\n- Next-action panel driven by case state (informational, not automated adjudication)\n- Activity history surfaced from immutable audit events\n- PII minimization patterns (masking, progressive disclosure by role)\n\n## Scope (Out)\n- Full adjudication decision logic\n- Free-form data access outside role entitlements\n\n## Acceptance Criteria (High-Level)\n- Given a user opens a case, when the summary loads, then they can identify status, owner, and next action without navigating elsewhere\n- Given an action is taken, when saved, then the history reflects it with actor, timestamp, and outcome\n\n## Observability\n- Metrics: case load latency, action rate per case, masking/unmasking usage (if applicable)\n\n## Definition of Done\n- Summary view meets accessibility and safe-data guidelines\n- History is immutable and consistent with audit events",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-workflow-004",
+      "title": "Enable alerts triage with acknowledgement, case linking, and follow-up completeness",
+      "description": "## Summary\nProvide an alerts surface that allows users to acknowledge alerts, link them to cases, and record follow-up actions consistently so nothing falls through the cracks.\n\n## Business Outcomes\n- Improve alert handling completeness and reduce missed follow-ups\n- Increase traceability between alerts and case actions\n\n## Success Metrics\n- 90% of alerts acknowledged within SLA window\n- 80% of alerts have a recorded follow-up action when required\n\n## Scope (In)\n- Alerts list with filtering and safe defaults\n- Acknowledge/unacknowledge with audit events\n- Link alerts to cases (or mark as unlinked with reason)\n- Follow-up actions: notes, dispositions, routing\n\n## Scope (Out)\n- Automated alert resolution\n- Complex correlation/triangulation engines\n\n## Acceptance Criteria (High-Level)\n- Given an alert is visible, when acknowledged, then the acknowledgement is recorded and visible in both alert and case history (if linked)\n- Given follow-up is required, when recorded, then metrics reflect completeness and the case timeline updates\n\n## Observability\n- Metrics: acknowledgement rate, follow-up completion rate, unlinked alert rate\n\n## Definition of Done\n- Alerts UX handles empty/no-result/error states\n- All key actions are audited",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-workflow-005",
+      "title": "Provide operational visibility for workload health (counts, aging, throughput) with safe exports",
+      "description": "## Summary\nDeliver lightweight operational reporting that helps leaders and operators understand workload health—without exposing sensitive data—and supports basic exports for downstream workflows.\n\n## Business Outcomes\n- Improve visibility into bottlenecks and aging items\n- Support operational reporting needs without building a full BI platform\n\n## Success Metrics\n- Dashboard p95 load ≤ 3s for standard ranges\n- Metrics definitions documented and used consistently\n\n## Scope (In)\n- Core metrics: counts by status, aging distribution, throughput over time\n- Segmentation by owner/team/project (as applicable)\n- Safe CSV exports with role-based field selection\n- Metric definitions glossary\n\n## Scope (Out)\n- Self-service report builder\n- Predictive analytics\n\n## Acceptance Criteria (High-Level)\n- Given a user opens the dashboard, when viewing a standard range, then metrics render quickly with clear definitions\n- Given a user exports a report, when generated, then export respects RBAC and excludes restricted fields\n\n## Observability\n- Metrics: dashboard latency, export success rate, most-used filters\n\n## Definition of Done\n- Exports are permission-gated and audited\n- Metric definitions are documented",
+      "workItemType": "Epic",
+      "feedbackScore": 4.7,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-feature-003",
+      "title": "Stream generation progress to the UI using SSE with correlation IDs",
+      "description": "## Summary\nProvide real-time progress updates during generation via Server-Sent Events (SSE) so users can understand what the system is doing and troubleshoot when needed.\n\n## Functional Requirements\n- SSE endpoint streams workflow stage events (retrieve, generate, validate, publish)\n- Events include correlationId and timestamps\n- UI renders progress and error states without polling\n\n## Acceptance Criteria\n- Given a generation is in progress, when a user opens the session, then they see streaming progress within 2 seconds\n- Given an error occurs, when an SSE error event is emitted, then the UI shows a human-readable message and keeps partial results\n\n## Definition of Done\n- SSE messages are versioned and documented\n- Telemetry captures event counts and stage latency\n- Tests cover connect/disconnect and error scenarios",
+      "workItemType": "Feature",
+      "feedbackScore": 4.5,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-feature-004",
+      "title": "Implement resilience patterns for external dependencies (AI, Search, DevOps)",
+      "description": "## Summary\nStandardize retry/backoff, timeouts, and fallback behaviors for calls to external services to improve reliability under throttling and transient failures.\n\n## Scope\n- Respect Retry-After and implement exponential backoff on 429\n- Use timeouts and cancellation tokens consistently\n- Provide graceful degradation when context retrieval fails\n\n## Acceptance Criteria\n- Given AI services return 429, when the system retries, then it uses Retry-After when provided and logs the backoff decision\n- Given Search is unavailable, when generation runs, then the workflow continues with a warning and no crash\n\n## Definition of Done\n- Centralized policy utilities (reused across integrations)\n- Tests simulate 429/503 conditions\n- Logs include dependency name, status code, and correlationId",
+      "workItemType": "Feature",
+      "feedbackScore": 4.6,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-003",
+      "title": "Implement Retry-After aware backoff for AI throttling responses",
+      "description": "As a platform engineer, I want agent calls to honor 429 Retry-After headers and apply exponential backoff, so that APMA remains reliable under load and avoids cascading failures.\n\n### Acceptance Criteria\n- Given an AI call returns 429 with Retry-After, when retrying, then the delay matches Retry-After within a small jitter\n- Given 429 occurs without Retry-After, when retrying, then backoff uses exponential strategy with a max delay\n- Given retries exceed the configured limit, when the operation fails, then the user sees a clear error and the failure is logged with correlationId\n\n### Definition of Done\n- Implementation is cancelable via CancellationToken\n- Logs redact any sensitive request data\n- Unit tests cover both Retry-After and no-header cases",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.5,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-004",
+      "title": "Add structured logging with redaction and end-to-end correlation",
+      "description": "As an operator, I want logs to be structured, correlated, and safe, so that I can troubleshoot issues without exposing secrets or prompt content.\n\n### Acceptance Criteria\n- Given a request is processed, when logs are emitted, then they include correlationId, sessionId (if available), and outcome\n- Given an exception occurs, when it is logged, then it includes dependency context and a safe message (no secrets)\n\n### Definition of Done\n- Logging fields are consistent across API, workflow, and integration layers\n- Redaction rules cover tokens, keys, and any user-provided secrets\n- Tests validate that known secret patterns are removed",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.6,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-005",
+      "title": "Seed enterprise RAG content (golden examples, templates, domain standards) into Search",
+      "description": "As a platform engineer, I want initial RAG content seeded into Azure AI Search, so that generator agents can produce enterprise-ready outputs from day one.\n\n### Acceptance Criteria\n- Given seed data exists in source control, when seeding runs, then golden examples, templates, feedback patterns, and domain context are uploaded to their indexes\n- Given seeding is run multiple times, when it re-runs, then documents are merged or overwritten idempotently\n- Given some docs fail, when seeding completes, then it reports failures with document IDs and continues processing others\n\n### Definition of Done\n- Seed content is curated for enterprise standards (security, observability, compliance)\n- Seeding supports local dev and CI\n- Basic verification query returns expected seeded docs",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.7,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-greenfield-001",
+      "title": "Establish architecture, infrastructure, and foundational capabilities for [Application Name]",
+      "description": "## Summary\nDefine and implement the foundational technical architecture, infrastructure, and cross-cutting capabilities required to build [Application Name]. This epic unblocks all feature development by establishing the technical foundation.\n\n## Business Outcomes\n- Reduce technical debt by making deliberate architecture decisions upfront\n- Enable parallel feature development with clear API contracts and data models\n- Ensure production readiness from day one with proper DevOps practices\n\n## Scope (In)\n- **Architecture & Design**: System architecture, ERD/data models, API contracts, tech stack selection\n- **Infrastructure & DevOps**: CI/CD pipelines, environment provisioning (dev/staging/prod), IaC templates\n- **Authentication & Authorization**: Identity provider integration, user roles, permission model\n- **Observability Baseline**: Structured logging, distributed tracing, health checks, basic alerting\n- **Security Baseline**: Secret management, network security, vulnerability scanning\n\n## Scope (Out)\n- Feature-specific business logic (covered by other epics)\n- Advanced analytics/reporting infrastructure (unless core to MVP)\n- Performance optimization beyond baseline (covered in later iterations)\n\n## Acceptance Criteria (High-Level)\n- Given the architecture is defined, when developers start feature work, then they have clear API contracts and data models to build against\n- Given CI/CD is configured, when code is merged to main, then it automatically builds, tests, and deploys to the dev environment\n- Given a user authenticates, when they access the application, then their identity and permissions are validated correctly\n- Given the application is running, when operators need to troubleshoot, then logs and traces are available with correlation IDs\n\n## Definition of Done\n- Architecture Decision Records (ADRs) documented for key technical choices\n- ERD and API contracts reviewed and approved\n- CI/CD pipeline successfully deploys to at least one environment\n- Authentication flow tested end-to-end\n- Observability verified with sample requests showing correlated logs/traces\n- Security review completed for infrastructure and auth patterns\n\n## Sizing Guidance\nThis is typically a **Medium (M)** epic for simple applications or **Large (L)** for enterprise applications with compliance requirements. Consider splitting into sub-epics if the scope exceeds 2-3 sprints:\n- Architecture & Data Modeling\n- Infrastructure & DevOps\n- Authentication & Security\n- Observability & Operations",
+      "workItemType": "Epic",
+      "feedbackScore": 4.9,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-epic-greenfield-002",
+      "title": "Implement compliance and regulatory requirements for [Application Name]",
+      "description": "## Summary\nEnsure [Application Name] meets all applicable compliance and regulatory requirements based on the industry and data being handled. This epic addresses legal, security, and privacy obligations.\n\n## Business Outcomes\n- Avoid legal/regulatory penalties by meeting compliance requirements before launch\n- Build user trust through demonstrated security and privacy practices\n- Enable enterprise sales by meeting procurement security requirements\n\n## Scope (Adapt based on domain)\n- **Healthcare (HIPAA)**: PHI encryption at rest/transit, access controls, audit logging, BAA requirements\n- **Financial (SOC2/PCI)**: Data protection controls, access reviews, penetration testing, audit trails\n- **Privacy (GDPR/CCPA)**: Consent management, data subject rights, data retention policies, privacy notices\n- **General Security**: Vulnerability management, incident response plan, security training\n\n## Acceptance Criteria (High-Level)\n- Given sensitive data is stored, when at rest, then it is encrypted using approved algorithms\n- Given a user requests their data, when the request is processed, then they can export or delete their data within regulatory timeframes\n- Given a security incident occurs, when detected, then the incident response plan is executed and documented\n- Given an audit is requested, when auditors review logs, then all required events are captured with timestamps and actor IDs\n\n## Definition of Done\n- Compliance requirements mapped to technical controls\n- Data classification completed for all data types\n- Required security controls implemented and tested\n- Privacy policy and terms of service reviewed by legal\n- Audit logging verified to capture required events\n- Penetration test or security assessment completed (if required)\n\n## Sizing Guidance\nCompliance epics are typically **Large (L)** or **Extra Large (XL)** for regulated industries. Consider splitting by compliance domain if multiple frameworks apply.",
+      "workItemType": "Epic",
+      "feedbackScore": 4.8,
+      "usageCount": 0
+    },
+    {
+      "@search.action": "upload",
+      "id": "ge-pbi-006",
+      "title": "Deliver a vertical slice of the intake workflow with end-to-end validation",
+      "description": "As a requestor, I want to submit a complete intake form and see validation feedback, so that I can confidently hand off requirements without back-and-forth.\n\n## Acceptance Criteria\n- Given a user enters required fields, when they submit, then the request is accepted and a confirmation is shown\n- Given a required field is missing, when they submit, then the UI highlights the missing field and shows a clear message\n- Given the request is accepted, when it is stored, then an audit event is recorded with correlationId\n\n## Definition of Done\n- End-to-end path includes UI, API, and persistence\n- Validation rules are documented and tested\n- Telemetry captures success and validation failure events\n- Docs updated for the intake workflow",
+      "workItemType": "ProductBacklogItem",
+      "feedbackScore": 4.7,
+      "usageCount": 0
+    }
+  ]
+}

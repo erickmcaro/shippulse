@@ -1,0 +1,103 @@
+{
+  "value": [
+    {
+      "@search.action": "upload",
+      "id": "fb-001",
+      "workItemType": "Epic",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Clarity",
+      "pattern": "Epic descriptions that include scope (in/out), measurable outcomes, and dependencies reduce reviewer back-and-forth."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-002",
+      "workItemType": "Feature",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Structure",
+      "pattern": "Features that explicitly list functional requirements and non-functional requirements are easier to estimate and split into PBIs."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-003",
+      "workItemType": "ProductBacklogItem",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Acceptance Criteria",
+      "pattern": "PBIs with 2+ Given/When/Then acceptance criteria are more testable and produce better outcomes in implementation and QA."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-004",
+      "workItemType": "ProductBacklogItem",
+      "thumbs": "down",
+      "score": -1.0,
+      "category": "Vagueness",
+      "pattern": "Avoid placeholder language (TBD/TODO) and generic titles like 'update' or 'new feature'. Use specific verbs and measurable outcomes."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-005",
+      "workItemType": "Feature",
+      "thumbs": "down",
+      "score": -1.0,
+      "category": "Missing NFRs",
+      "pattern": "If a feature omits security/observability expectations, teams implement inconsistently. Always specify logging, telemetry, and failure behavior."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-006",
+      "workItemType": "Epic",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Governance",
+      "pattern": "Include constraints like 'no secrets in code' and 'least privilege RBAC' to align delivery with enterprise governance from day one."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-007",
+      "workItemType": "Feature",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Observability",
+      "pattern": "Features that specify required logs/metrics/traces upfront are delivered with fewer production surprises and faster incident resolution."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-008",
+      "workItemType": "ProductBacklogItem",
+      "thumbs": "up",
+      "score": 1.0,
+      "category": "Definition of Done",
+      "pattern": "PBIs that include an explicit DoD checklist (tests, telemetry, docs) have higher completion quality and fewer reopen cycles."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-009",
+      "workItemType": "Epic",
+      "thumbs": "down",
+      "score": -1.0,
+      "category": "Scope Creep",
+      "pattern": "Epics without clear out-of-scope boundaries tend to expand. Always include explicit non-goals or out-of-scope bullets."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-010",
+      "workItemType": "Feature",
+      "thumbs": "down",
+      "score": -1.0,
+      "category": "Testability",
+      "pattern": "If acceptance criteria are not testable, delivery slows. Rewrite AC to be observable, measurable, and verifiable."
+    },
+    {
+      "@search.action": "upload",
+      "id": "fb-011",
+      "workItemType": "ProductBacklogItem",
+      "thumbs": "down",
+      "score": -1.0,
+      "category": "Missing Failure Behavior",
+      "pattern": "PBIs should state failure behavior (timeouts, retries, user messaging). Missing failure modes leads to inconsistent resilience."
+    }
+  ]
+}

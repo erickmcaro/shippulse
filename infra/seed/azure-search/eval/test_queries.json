@@ -1,0 +1,347 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "created": "2025-12-02",
+    "updated": "2025-12-02",
+    "description": "Evaluation queries for APMA Planning Agent RAG retrieval - tests generation-focused use cases",
+    "target_metric": "Precision@5 >= 0.75",
+    "total_queries": 20,
+    "note": "Queries simulate what users ask the APMA Planning Agent when generating Epics, PBIs, and estimates"
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "query": "Create an Epic for implementing user authentication with SSO",
+      "intent": "Generate Epic with proper structure, business value, and acceptance criteria",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-epic-authentication.md",
+        "epic-decomposition-playbook.md",
+        "definition-of-ready.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_epic"
+    },
+    {
+      "id": "q02",
+      "query": "Break down this goal into user stories: Build a data export feature for compliance reporting",
+      "intent": "Decompose high-level goal into Epic with Stories",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-epic-data-export.md",
+        "epic-decomposition-playbook.md",
+        "story-splitting-patterns.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "decompose_goal"
+    },
+    {
+      "id": "q03",
+      "query": "Generate acceptance criteria for a REST API endpoint that returns user profile data",
+      "intent": "Create specific, testable acceptance criteria for API PBI",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-pbi-api-endpoint.md",
+        "golden-acceptance-criteria-examples.md",
+        "acceptance-criteria-standards.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_acceptance_criteria"
+    },
+    {
+      "id": "q04",
+      "query": "Estimate story points for building a React dashboard component with charts",
+      "intent": "Provide S/M/L estimate with rationale for UI work",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-pbi-ui-component.md",
+        "elatta-estimation-examples.md",
+        "story-point-guidelines.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "estimate_story_points"
+    },
+    {
+      "id": "q05",
+      "query": "Write a PBI for migrating the users table to add new columns for audit fields",
+      "intent": "Generate database migration PBI with proper AC and risks",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-pbi-database-migration.md",
+        "golden-acceptance-criteria-examples.md",
+        "definition-of-done.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_pbi"
+    },
+    {
+      "id": "q06",
+      "query": "This story is too big (21 points). Help me split it into smaller deliverables",
+      "intent": "Apply splitting patterns to break down large story",
+      "expected_category": "best-practices",
+      "expected_documents": [
+        "story-splitting-patterns.md",
+        "vertical-slicing-guide.md",
+        "invest-criteria-guide.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "split_story"
+    },
+    {
+      "id": "q07",
+      "query": "Apply Definition of Ready checklist to this story before sprint planning",
+      "intent": "Validate story meets DoR criteria",
+      "expected_category": "definitions",
+      "expected_documents": [
+        "definition-of-ready.md",
+        "invest-criteria-guide.md",
+        "backlog-refinement-playbook.md"
+      ],
+      "difficulty": "easy",
+      "agent_action": "validate_dor"
+    },
+    {
+      "id": "q08",
+      "query": "Generate Definition of Done criteria for this feature before we mark it complete",
+      "intent": "Create DoD checklist for feature completion",
+      "expected_category": "definitions",
+      "expected_documents": [
+        "definition-of-done.md",
+        "acceptance-criteria-standards.md",
+        "golden-acceptance-criteria-examples.md"
+      ],
+      "difficulty": "easy",
+      "agent_action": "generate_dod"
+    },
+    {
+      "id": "q09",
+      "query": "Create a spike to research options for real-time notifications using WebSockets vs SSE",
+      "intent": "Generate research spike with time-box and deliverables",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-spike-template.md",
+        "estimation-techniques-playbook.md",
+        "story-splitting-patterns.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_spike"
+    },
+    {
+      "id": "q10",
+      "query": "Estimate this Epic using the Elatta method: UI/Logic/Data/Test breakdown",
+      "intent": "Apply Elatta estimation with component breakdown",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "elatta-estimation-examples.md",
+        "estimation-techniques-playbook.md",
+        "story-point-guidelines.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "estimate_elatta"
+    },
+    {
+      "id": "q11",
+      "query": "Generate a bug report template for a critical production issue with user login",
+      "intent": "Create structured bug report with repro steps and severity",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-bug-report-template.md",
+        "priority-classification.md",
+        "acceptance-criteria-standards.md"
+      ],
+      "difficulty": "easy",
+      "agent_action": "generate_bug_report"
+    },
+    {
+      "id": "q12",
+      "query": "Create 3-5 user stories for an Epic about implementing search functionality",
+      "intent": "Generate multiple stories with proper hierarchy under Epic",
+      "expected_category": "playbooks",
+      "expected_documents": [
+        "epic-decomposition-playbook.md",
+        "user-story-writing-playbook.md",
+        "golden-epic-authentication.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "generate_stories"
+    },
+    {
+      "id": "q13",
+      "query": "Write acceptance criteria using Given-When-Then format for file upload feature",
+      "intent": "Generate BDD-style acceptance criteria",
+      "expected_category": "definitions",
+      "expected_documents": [
+        "acceptance-criteria-standards.md",
+        "golden-acceptance-criteria-examples.md",
+        "acceptance-criteria-playbook.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_acceptance_criteria"
+    },
+    {
+      "id": "q14",
+      "query": "Help me write a PBI for a new UI component: sortable data table with pagination",
+      "intent": "Generate frontend PBI with proper technical AC",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-pbi-ui-component.md",
+        "golden-acceptance-criteria-examples.md",
+        "user-story-writing-playbook.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "generate_pbi"
+    },
+    {
+      "id": "q15",
+      "query": "Decompose this Epic into vertical slices that deliver end-to-end value",
+      "intent": "Apply vertical slicing to create thin, valuable stories",
+      "expected_category": "best-practices",
+      "expected_documents": [
+        "vertical-slicing-guide.md",
+        "story-splitting-patterns.md",
+        "epic-decomposition-playbook.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "decompose_vertical"
+    },
+    {
+      "id": "q16",
+      "query": "Generate a technical task breakdown for implementing OAuth 2.0 integration",
+      "intent": "Create detailed task list for complex technical work",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-technical-task-breakdown.md",
+        "golden-pbi-api-endpoint.md",
+        "elatta-estimation-examples.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "generate_tasks"
+    },
+    {
+      "id": "q17",
+      "query": "Prioritize these 5 backlog items using WSJF scoring",
+      "intent": "Apply WSJF to rank items by value/effort",
+      "expected_category": "definitions",
+      "expected_documents": [
+        "priority-classification.md",
+        "backlog-refinement-playbook.md",
+        "estimation-techniques-playbook.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "prioritize_wsjf"
+    },
+    {
+      "id": "q18",
+      "query": "Check if this user story follows INVEST criteria and suggest improvements",
+      "intent": "Validate and improve story quality",
+      "expected_category": "best-practices",
+      "expected_documents": [
+        "invest-criteria-guide.md",
+        "user-story-writing-playbook.md",
+        "definition-of-ready.md"
+      ],
+      "difficulty": "medium",
+      "agent_action": "validate_invest"
+    },
+    {
+      "id": "q19",
+      "query": "Create an Epic for a mobile app feature with offline sync capability",
+      "intent": "Generate Epic for complex mobile feature",
+      "expected_category": "exemplars",
+      "expected_documents": [
+        "golden-epic-data-export.md",
+        "epic-decomposition-playbook.md",
+        "golden-acceptance-criteria-examples.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "generate_epic"
+    },
+    {
+      "id": "q20",
+      "query": "Generate a complete work breakdown structure for this initiative: Implement customer feedback portal",
+      "intent": "Create full Epic → Stories hierarchy with estimates",
+      "expected_category": "playbooks",
+      "expected_documents": [
+        "epic-decomposition-playbook.md",
+        "story-splitting-patterns.md",
+        "golden-epic-authentication.md",
+        "elatta-estimation-examples.md"
+      ],
+      "difficulty": "hard",
+      "agent_action": "generate_wbs"
+    }
+  ],
+  "categories": {
+    "playbooks": {
+      "description": "Process and methodology guides for PM activities",
+      "document_count": 10,
+      "path": "content/playbooks/",
+      "use_case": "Agent retrieves when decomposing goals, planning sprints, refining backlog"
+    },
+    "definitions": {
+      "description": "Standards, criteria, and quality gates",
+      "document_count": 5,
+      "path": "content/definitions/",
+      "use_case": "Agent retrieves when validating DoR/DoD, applying INVEST, prioritizing"
+    },
+    "exemplars": {
+      "description": "Golden examples and templates for work items",
+      "document_count": 10,
+      "path": "content/exemplars/",
+      "use_case": "Agent retrieves when generating Epics, PBIs, acceptance criteria, estimates"
+    },
+    "best-practices": {
+      "description": "Patterns, anti-patterns, and guidance",
+      "document_count": 5,
+      "path": "content/best-practices/",
+      "use_case": "Agent retrieves when splitting stories, applying vertical slicing, improving quality"
+    }
+  },
+  "agent_actions": {
+    "generate_epic": "Create Epic with business value, scope, and acceptance criteria",
+    "generate_pbi": "Create PBI/User Story with AC and technical notes",
+    "generate_stories": "Create multiple user stories under an Epic",
+    "generate_acceptance_criteria": "Create specific, testable acceptance criteria",
+    "generate_spike": "Create research spike with time-box and deliverables",
+    "generate_bug_report": "Create structured bug report with severity and repro steps",
+    "generate_tasks": "Create technical task breakdown for implementation",
+    "generate_dod": "Create Definition of Done checklist for feature",
+    "generate_wbs": "Create full work breakdown structure (Epic → Stories)",
+    "decompose_goal": "Break high-level goal into Epic with Stories",
+    "decompose_vertical": "Decompose into vertical slices delivering end-to-end value",
+    "split_story": "Split large story into smaller deliverables",
+    "estimate_story_points": "Provide S/M/L estimate with rationale",
+    "estimate_elatta": "Apply Elatta method (UI/Logic/Data/Test breakdown)",
+    "validate_dor": "Check story meets Definition of Ready criteria",
+    "validate_invest": "Validate story against INVEST criteria",
+    "prioritize_wsjf": "Apply WSJF scoring for prioritization"
+  },
+  "evaluation_config": {
+    "metrics": [
+      {
+        "name": "Precision@5",
+        "description": "Fraction of top 5 results that are relevant",
+        "target": 0.75,
+        "formula": "relevant_in_top_5 / 5"
+      },
+      {
+        "name": "Recall@10",
+        "description": "Fraction of relevant documents found in top 10",
+        "target": 0.80,
+        "formula": "relevant_in_top_10 / total_relevant"
+      },
+      {
+        "name": "MRR",
+        "description": "Mean Reciprocal Rank of first relevant result",
+        "target": 0.70,
+        "formula": "1 / rank_of_first_relevant"
+      }
+    ],
+    "relevance_criteria": {
+      "highly_relevant": "Document directly answers the query",
+      "relevant": "Document contains useful related information",
+      "marginally_relevant": "Document has some tangential connection",
+      "not_relevant": "Document does not help answer the query"
+    }
+  }
+}

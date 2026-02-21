@@ -1,0 +1,160 @@
+# Agile planning flow inspired by APMA (Epic Planner + Feature Designer).
+id: product-planning
+name: Product Planning (Epics -> Features)
+version: 1
+description: |
+  Planning-only workflow that converts a product vision into project-ready
+  Epics and Features. It follows APMA-style decomposition guardrails:
+  small epic set, then 2-5 features per epic.
+  If a seed knowledgebase exists (infra/seed), it is summarized first and used
+  as planning context.
+
+polling:
+  model: default
+  timeoutSeconds: 120
+
+agents:
+  - id: epic-planner
+    name: Epic Planner
+    role: analysis
+    description: Generates a small set of outcome-framed epics from product vision.
+    workspace:
+      baseDir: agents/epic-planner
+      files:
+        AGENTS.md: agents/epic-planner/AGENTS.md
+        SOUL.md: agents/epic-planner/SOUL.md
+        IDENTITY.md: agents/epic-planner/IDENTITY.md
+
+  - id: feature-designer
+    name: Feature Designer
+    role: analysis
+    description: Expands each generated epic into independently deliverable features.
+    workspace:
+      baseDir: agents/feature-designer
+      files:
+        AGENTS.md: agents/feature-designer/AGENTS.md
+        SOUL.md: agents/feature-designer/SOUL.md
+        IDENTITY.md: agents/feature-designer/IDENTITY.md
+
+steps:
+  - id: kb-scan
+    agent: epic-planner
+    input: |
+      Build a concise planning context from any local seed knowledgebase.
+
+      PRODUCT REQUEST:
+      {{task}}
+
+      Search this local knowledgebase path:
+      1. ./infra/seed
+
+      Priority files (if present):
+      - azure-search/domain-context.json
+      - azure-search/templates.json
+      - azure-search/golden-examples.json
+      - azure-search/feedback.json
+      - cosmos/definitions/*.md
+      - cosmos/best-practices/*.md
+      - cosmos/exemplars/*.md
+
+      Your output should distill only high-signal planning constraints and patterns.
+      Keep it compact and reusable by later steps.
+
+      Reply with:
+      STATUS: done
+      KB_CONTEXT: concise planning standards and constraints
+      KB_EPIC_PATTERNS: epic-level patterns and anti-patterns
+      KB_FEATURE_PATTERNS: feature-level patterns and anti-patterns
+      KB_TEMPLATE_SNIPPETS: small structural snippets (no huge dumps)
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: generate-epics
+    agent: epic-planner
+    input: |
+      Generate project-ready epics from this product request.
+
+      PRODUCT REQUEST:
+      {{task}}
+
+      KNOWLEDGEBASE CONTEXT:
+      {{kb_context}}
+
+      EPIC PATTERNS:
+      {{kb_epic_patterns}}
+
+      TEMPLATE SNIPPETS:
+      {{kb_template_snippets}}
+
+      Constraints:
+      1. Target 6-8 epics (hard cap 10)
+      2. Each epic must be outcome-framed and independently valuable
+      3. Each epic must include at least one measurable success metric
+      4. Keep overlap low and consolidate by shared persona/workflow/KPI
+      5. Use acceptance criteria with given/when/then
+
+      Reply with:
+      STATUS: done
+      EPICS_JSON: [ ... ]
+      COVERAGE_JSON: { "addressed": [...], "notAddressed": [...], "assumptions": [...], "consolidationNotes": [...] }
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: generate-features
+    agent: feature-designer
+    input: |
+      Generate project-ready features for each epic.
+
+      PRODUCT REQUEST:
+      {{task}}
+
+      EPICS_JSON:
+      {{epics_json}}
+
+      KNOWLEDGEBASE CONTEXT:
+      {{kb_context}}
+
+      FEATURE PATTERNS:
+      {{kb_feature_patterns}}
+
+      TEMPLATE SNIPPETS:
+      {{kb_template_snippets}}
+
+      Coverage notes from epic planning:
+      {{coverage_json}}
+
+      Constraints:
+      1. Generate 2-5 features per epic
+      2. Features should be independently testable and deliverable
+      3. Keep stable ordering: priority (P1->P4), then title (A->Z)
+      4. Each feature must include acceptance criteria with given/when/then
+      5. Use estimatedSize S/M/L
+
+      Reply with:
+      STATUS: done
+      FEATURES_BY_EPIC_JSON: [
+        {
+          "epicId": "E-001",
+          "epicTitle": "Epic title",
+          "features": [
+            {
+              "title": "Feature title",
+              "description": "Feature description",
+              "acceptanceCriteria": [
+                { "given": "...", "when": "...", "then": "...", "and": ["optional"] }
+              ],
+              "priority": "P1",
+              "estimatedSize": "M",
+              "rationale": "Why this feature exists"
+            }
+          ]
+        }
+      ]
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
