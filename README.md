@@ -235,7 +235,9 @@ shippulse kb search "incident response runbook"
 Embedding auth resolution order:
 
 1. `OPENAI_API_KEY` (optional explicit override)
-2. OpenClaw auth profiles (`~/.openclaw/agents/main/agent/auth-profiles.json`) for OpenAI-compatible providers
+2. OpenClaw auth profiles (`~/.openclaw/agents/main/agent/auth-profiles.json`) for OpenAI-compatible providers (`api_key`, `token`, or OAuth `access` credentials)
+
+This includes OpenClaw Codex login profiles (for example `openai-codex:*`) when present in `auth-profiles.json`.
 
 Optional: set `OPENCLAW_EMBEDDING_PROFILE=<profile-id>` to force a specific OpenClaw profile.
 

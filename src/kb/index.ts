@@ -31,10 +31,14 @@ type EmbeddingCredentials = {
 };
 
 type OpenClawAuthProfile = {
+  type?: string;
   provider?: string;
   token?: string;
   apiKey?: string;
   key?: string;
+  access?: string;
+  accessToken?: string;
+  expires?: number;
   baseUrl?: string;
   baseURL?: string;
   endpoint?: string;
@@ -90,9 +94,9 @@ const DEFAULT_OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.open
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENAI_COMPATIBLE_PROVIDERS = new Set([
   "openai",
+  "openai-codex",
   "openrouter",
   "azure-openai",
-  "azure_openai",
 ]);
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -175,6 +179,34 @@ function asTrimmed(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function asFiniteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number") return undefined;
+  if (!Number.isFinite(value)) return undefined;
+  return value;
+}
+
+function normalizeProvider(provider: string | undefined): string | undefined {
+  if (!provider) return undefined;
+  const normalized = provider.toLowerCase();
+  if (normalized === "azure_openai") return "azure-openai";
+  if (normalized === "openai_codex" || normalized === "codex-cli") return "openai-codex";
+  return normalized;
+}
+
+function normalizeProfileType(type: string | undefined): "api_key" | "token" | "oauth" | undefined {
+  if (!type) return undefined;
+  const normalized = type.toLowerCase();
+  if (normalized === "api_key" || normalized === "api-key") return "api_key";
+  if (normalized === "token") return "token";
+  if (normalized === "oauth") return "oauth";
+  return undefined;
+}
+
+function isProfileExpired(profile: OpenClawAuthProfile): boolean {
+  const expires = asFiniteNumber(profile.expires);
+  return typeof expires === "number" && expires > 0 && Date.now() >= expires;
 }
 
 function parseJsonSeedDocs(seedRoot: string, relPath: string, items: any[], kind: string): KnowledgeDoc[] {
@@ -332,8 +364,9 @@ type EmbeddingFn = (inputs: string[]) => Promise<number[][]>;
 function rankProvider(provider: string | undefined): number {
   if (!provider) return 100;
   if (provider === "openai") return 0;
-  if (provider === "openrouter") return 1;
-  if (OPENAI_COMPATIBLE_PROVIDERS.has(provider)) return 2;
+  if (provider === "openai-codex") return 1;
+  if (provider === "openrouter") return 2;
+  if (OPENAI_COMPATIBLE_PROVIDERS.has(provider)) return 3;
   return 100;
 }
 
@@ -366,10 +399,23 @@ function openClawProfileToCredentials(
   profileId: string,
   profile: OpenClawAuthProfile,
 ): EmbeddingCredentials | null {
-  const provider = asTrimmed(profile.provider)?.toLowerCase();
+  if (isProfileExpired(profile)) return null;
+
+  const provider = normalizeProvider(asTrimmed(profile.provider));
   if (provider && !OPENAI_COMPATIBLE_PROVIDERS.has(provider)) return null;
 
-  const apiKey = asTrimmed(profile.token) || asTrimmed(profile.apiKey) || asTrimmed(profile.key);
+  const profileType = normalizeProfileType(asTrimmed(profile.type));
+  const apiKey = profileType === "oauth"
+    ? asTrimmed(profile.access) || asTrimmed(profile.accessToken) || asTrimmed(profile.token)
+    : profileType === "api_key"
+      ? asTrimmed(profile.apiKey) || asTrimmed(profile.key) || asTrimmed(profile.token)
+      : profileType === "token"
+        ? asTrimmed(profile.token) || asTrimmed(profile.apiKey) || asTrimmed(profile.key)
+        : asTrimmed(profile.token)
+          || asTrimmed(profile.apiKey)
+          || asTrimmed(profile.key)
+          || asTrimmed(profile.access)
+          || asTrimmed(profile.accessToken);
   if (!apiKey) return null;
 
   const baseUrl = asTrimmed(process.env.OPENAI_BASE_URL)
@@ -401,7 +447,7 @@ async function resolveEmbeddingCredentials(): Promise<EmbeddingCredentials> {
   const profiles = await readOpenClawAuthProfiles();
   const entries = Object.entries(profiles);
   const ranked = entries
-    .map(([profileId, profile]) => ({ profileId, profile, rank: rankProvider(asTrimmed(profile.provider)?.toLowerCase()) }))
+    .map(([profileId, profile]) => ({ profileId, profile, rank: rankProvider(normalizeProvider(asTrimmed(profile.provider))) }))
     .sort((a, b) => {
       if (preferredProfileId) {
         if (a.profileId === preferredProfileId) return -1;
