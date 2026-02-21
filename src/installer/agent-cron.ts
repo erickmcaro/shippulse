@@ -23,7 +23,7 @@ function buildAgentPrompt(workflowId: string, agentId: string): string {
 
 Step 1 — Check for pending work:
 \`\`\`
-node ${cli} step claim "${fullAgentId}"
+node "${cli}" step claim "${fullAgentId}"
 \`\`\`
 
 If output is "NO_WORK", reply HEARTBEAT_OK and stop.
@@ -36,22 +36,24 @@ Step 3 — Do the work described in the input. Format your output with KEY: valu
 
 Step 4 — MANDATORY: Report completion (do this IMMEDIATELY after finishing the work):
 \`\`\`
-cat <<'SHIPPULSE_EOF' > /tmp/shippulse-step-output.txt
+OUTPUT_FILE="$(mktemp /tmp/shippulse-step-output.XXXXXX)"
+cat <<'SHIPPULSE_EOF' > "$OUTPUT_FILE"
 STATUS: done
 CHANGES: what you did
 TESTS: what tests you ran
 SHIPPULSE_EOF
-cat /tmp/shippulse-step-output.txt | node ${cli} step complete "<stepId>"
+cat "$OUTPUT_FILE" | node "${cli}" step complete "<stepId>"
+rm -f "$OUTPUT_FILE"
 \`\`\`
 
 If the work FAILED:
 \`\`\`
-node ${cli} step fail "<stepId>" "description of what went wrong"
+node "${cli}" step fail "<stepId>" "description of what went wrong"
 \`\`\`
 
 RULES:
 1. NEVER end your session without calling step complete or step fail
-2. Write output to a file first, then pipe via stdin (shell escaping breaks direct args)
+2. Write output to a unique temp file first, then pipe via stdin (shell escaping breaks direct args)
 3. If you're unsure whether to complete or fail, call step fail with an explanation
 
 The workflow cannot advance until you report. Your session ending without reporting = broken pipeline.`;
@@ -73,22 +75,24 @@ Do the work described in the input. Format your output with KEY: value lines as 
 
 MANDATORY: Report completion (do this IMMEDIATELY after finishing the work):
 \`\`\`
-cat <<'SHIPPULSE_EOF' > /tmp/shippulse-step-output.txt
+OUTPUT_FILE="$(mktemp /tmp/shippulse-step-output.XXXXXX)"
+cat <<'SHIPPULSE_EOF' > "$OUTPUT_FILE"
 STATUS: done
 CHANGES: what you did
 TESTS: what tests you ran
 SHIPPULSE_EOF
-cat /tmp/shippulse-step-output.txt | node ${cli} step complete "<stepId>"
+cat "$OUTPUT_FILE" | node "${cli}" step complete "<stepId>"
+rm -f "$OUTPUT_FILE"
 \`\`\`
 
 If the work FAILED:
 \`\`\`
-node ${cli} step fail "<stepId>" "description of what went wrong"
+node "${cli}" step fail "<stepId>" "description of what went wrong"
 \`\`\`
 
 RULES:
 1. NEVER end your session without calling step complete or step fail
-2. Write output to a file first, then pipe via stdin (shell escaping breaks direct args)
+2. Write output to a unique temp file first, then pipe via stdin (shell escaping breaks direct args)
 3. If you're unsure whether to complete or fail, call step fail with an explanation
 
 The workflow cannot advance until you report. Your session ending without reporting = broken pipeline.`;
@@ -158,20 +162,20 @@ export function buildPollingPrompt(workflowId: string, agentId: string, workMode
   const failFastSpawnSection = FAILFAST_SPAWN_ERROR_ENABLED
     ? `If sessions_spawn returns any error (example: pairing required), you MUST fail the claimed step in the same turn:
 \`\`\`
-node ${cli} step fail "<stepId>" "spawn_error: <exact sessions_spawn error>"
+node "${cli}" step fail "<stepId>" "spawn_error: <exact sessions_spawn error>"
 \`\`\`
 Then reply SPAWN_FAILED with stepId and exact reason. Never leave a claimed step running after spawn failure.`
     : "If sessions_spawn fails, report the failure clearly before ending the turn.";
 
   return `Step 1 — Quick check for pending work (lightweight, no side effects):
 \`\`\`
-node ${cli} step peek "${fullAgentId}"
+node "${cli}" step peek "${fullAgentId}"
 \`\`\`
 If output is "NO_WORK", reply HEARTBEAT_OK and stop immediately. Do NOT run step claim.
 
 Step 2 — If "HAS_WORK", claim the step:
 \`\`\`
-node ${cli} step claim "${fullAgentId}"
+node "${cli}" step claim "${fullAgentId}"
 \`\`\`
 If output is "NO_WORK", reply HEARTBEAT_OK and stop.
 

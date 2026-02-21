@@ -60,4 +60,21 @@ describe("stop workflow cancellation event", () => {
     assert.ok(events.some((evt) => evt.event === "run.cancelled"));
     assert.ok(!events.some((evt) => evt.event === "run.failed"));
   });
+
+  it("does not rewrite already failed runs to cancelled", async () => {
+    const db = dbMod.getDb();
+    const runId = crypto.randomUUID();
+    const ts = new Date().toISOString();
+
+    db.prepare(
+      "INSERT INTO runs (id, workflow_id, task, status, context, created_at, updated_at) VALUES (?, 'idea-to-project', 'already failed', 'failed', '{}', ?, ?)"
+    ).run(runId, ts, ts);
+
+    const result = await statusMod.stopWorkflow(runId);
+    assert.equal(result.status, "already_done");
+    assert.match(result.message, /already "failed"/i);
+
+    const run = db.prepare("SELECT status FROM runs WHERE id = ?").get(runId) as { status: string };
+    assert.equal(run.status, "failed");
+  });
 });

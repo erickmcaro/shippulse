@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
+import { resolveOpenClawStateDir } from "./paths.js";
 
 /**
  * Get the path to the shippulse skills directory (bundled with shippulse).
@@ -14,7 +14,7 @@ function getShipPulseSkillsDir(): string {
  * Get the user's OpenClaw skills directory.
  */
 function getUserSkillsDir(): string {
-  return path.join(os.homedir(), ".openclaw", "skills");
+  return path.join(resolveOpenClawStateDir(), "skills");
 }
 
 /**

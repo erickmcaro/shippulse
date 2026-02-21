@@ -15,6 +15,12 @@ import {
 } from "./checks.js";
 import crypto from "node:crypto";
 
+function normalizeHistoryLimit(limit: number, fallback: number, max: number): number {
+  if (!Number.isFinite(limit) || !Number.isInteger(limit)) return fallback;
+  if (limit <= 0) return fallback;
+  return Math.min(limit, max);
+}
+
 // ── DB Migration ────────────────────────────────────────────────────
 
 export function ensureMedicTables(): void {
@@ -36,7 +42,7 @@ export function ensureMedicTables(): void {
 /**
  * Attempt to remediate a finding. Returns true if action was taken.
  */
-async function remediate(finding: MedicFinding): Promise<boolean> {
+export async function remediateFinding(finding: MedicFinding): Promise<boolean> {
   const db = getDb();
 
   switch (finding.action) {
@@ -44,45 +50,54 @@ async function remediate(finding: MedicFinding): Promise<boolean> {
       if (!finding.stepId) return false;
       // Reset the stuck step to pending so it can be reclaimed
       const step = db.prepare(
-        "SELECT run_id, step_id, type, current_story_id, abandoned_count FROM steps WHERE id = ?"
+        "SELECT run_id, step_id, type, status, current_story_id, abandoned_count FROM steps WHERE id = ?"
       ).get(finding.stepId) as {
         run_id: string;
         step_id: string;
         type: string;
+        status: string;
         current_story_id: string | null;
         abandoned_count: number;
       } | undefined;
       if (!step) return false;
+      if (step.status !== "running") return false;
 
-      if (finding.runId) {
-        emitEvent({
-          ts: new Date().toISOString(),
-          event: "step.stuck" as EventType,
-          runId: finding.runId,
-          stepId: finding.stepId,
-          detail: finding.message,
-        });
-      }
+      const run = db.prepare(
+        "SELECT status, workflow_id FROM runs WHERE id = ?"
+      ).get(step.run_id) as { status: string; workflow_id: string } | undefined;
+      if (!run || run.status !== "running") return false;
+
+      emitEvent({
+        ts: new Date().toISOString(),
+        event: "step.stuck" as EventType,
+        runId: step.run_id,
+        workflowId: run.workflow_id,
+        stepId: finding.stepId,
+        detail: finding.message,
+      });
 
       const newCount = (step.abandoned_count ?? 0) + 1;
       // Don't auto-reset if already abandoned too many times — let cleanupAbandonedSteps handle final failure
       if (newCount >= 5) {
         if (step.current_story_id) {
           db.prepare(
-            "UPDATE stories SET status = 'failed', output = 'Medic: abandoned too many times', updated_at = datetime('now') WHERE id = ?"
+            "UPDATE stories SET status = 'failed', output = 'Medic: abandoned too many times', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
           ).run(step.current_story_id);
         }
-        db.prepare(
-          "UPDATE steps SET status = 'failed', output = 'Medic: abandoned too many times', abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ?"
+        const stepResult = db.prepare(
+          "UPDATE steps SET status = 'failed', output = 'Medic: abandoned too many times', abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ? AND status = 'running'"
         ).run(newCount, finding.stepId);
-        if (finding.runId) {
-          db.prepare(
-            "UPDATE runs SET status = 'failed', updated_at = datetime('now') WHERE id = ?"
-          ).run(finding.runId);
+        if (Number(stepResult.changes) !== 1) return false;
+
+        const runResult = db.prepare(
+          "UPDATE runs SET status = 'failed', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
+        ).run(step.run_id);
+        if (Number(runResult.changes) === 1) {
           emitEvent({
             ts: new Date().toISOString(),
             event: "run.failed" as EventType,
-            runId: finding.runId,
+            runId: step.run_id,
+            workflowId: run.workflow_id,
             detail: "Medic: step abandoned too many times",
           });
         }
@@ -94,18 +109,19 @@ async function remediate(finding: MedicFinding): Promise<boolean> {
           "UPDATE stories SET status = 'pending', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
         ).run(step.current_story_id);
       }
-      db.prepare(
-        "UPDATE steps SET status = 'pending', abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ?"
+      const stepResult = db.prepare(
+        "UPDATE steps SET status = 'pending', abandoned_count = ?, current_story_id = NULL, updated_at = datetime('now') WHERE id = ? AND status = 'running'"
       ).run(newCount, finding.stepId);
-      if (finding.runId) {
+      if (Number(stepResult.changes) !== 1) return false;
+
         emitEvent({
           ts: new Date().toISOString(),
           event: "step.timeout" as EventType,
-          runId: finding.runId,
+          runId: step.run_id,
+          workflowId: run.workflow_id,
           stepId: finding.stepId,
           detail: `Medic: reset stuck step (abandon ${newCount}/5)${step.current_story_id ? " and returned current story to pending" : ""}`,
         });
-      }
       return true;
     }
 
@@ -114,9 +130,10 @@ async function remediate(finding: MedicFinding): Promise<boolean> {
       const run = db.prepare("SELECT status, workflow_id FROM runs WHERE id = ?").get(finding.runId) as { status: string; workflow_id: string } | undefined;
       if (!run || run.status !== "running") return false;
 
-      db.prepare(
-        "UPDATE runs SET status = 'failed', updated_at = datetime('now') WHERE id = ?"
+      const runResult = db.prepare(
+        "UPDATE runs SET status = 'failed', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
       ).run(finding.runId);
+      if (Number(runResult.changes) !== 1) return false;
       // Also fail any non-terminal steps
       db.prepare(
         "UPDATE steps SET status = 'failed', output = 'Medic: run marked as dead', updated_at = datetime('now') WHERE run_id = ? AND status IN ('waiting', 'pending', 'running')"
@@ -138,9 +155,10 @@ async function remediate(finding: MedicFinding): Promise<boolean> {
       const run = db.prepare("SELECT status, workflow_id FROM runs WHERE id = ?").get(finding.runId) as { status: string; workflow_id: string } | undefined;
       if (!run || run.status !== "running") return false;
 
-      db.prepare(
-        "UPDATE runs SET status = 'completed', updated_at = datetime('now') WHERE id = ?"
+      const runResult = db.prepare(
+        "UPDATE runs SET status = 'completed', updated_at = datetime('now') WHERE id = ? AND status = 'running'"
       ).run(finding.runId);
+      if (Number(runResult.changes) !== 1) return false;
       emitEvent({
         ts: new Date().toISOString(),
         event: "run.completed" as EventType,
@@ -205,7 +223,7 @@ export async function runMedicCheck(): Promise<MedicCheckResult> {
   let actionsTaken = 0;
   for (const finding of findings) {
     if (finding.action !== "none") {
-      const success = await remediate(finding);
+      const success = await remediateFinding(finding);
       if (success) {
         finding.remediated = true;
         actionsTaken++;
@@ -302,11 +320,12 @@ export function getRecentMedicChecks(limit = 20): Array<{
   details: MedicFinding[];
 }> {
   try {
+    const normalizedLimit = normalizeHistoryLimit(limit, 20, 500);
     ensureMedicTables();
     const db = getDb();
     const rows = db.prepare(
       "SELECT * FROM medic_checks ORDER BY checked_at DESC LIMIT ?"
-    ).all(limit) as Array<{
+    ).all(normalizedLimit) as Array<{
       id: string; checked_at: string; issues_found: number;
       actions_taken: number; summary: string; details: string;
     }>;

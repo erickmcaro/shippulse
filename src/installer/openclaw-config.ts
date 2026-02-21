@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import nodePath from "node:path";
 import JSON5 from "json5";
 import { resolveOpenClawConfigPath } from "./paths.js";
 
@@ -42,5 +43,6 @@ export async function writeOpenClawConfig(
   config: OpenClawConfig,
 ): Promise<void> {
   const content = `${JSON.stringify(config, null, 2)}\n`;
+  await fs.mkdir(nodePath.dirname(path), { recursive: true });
   await fs.writeFile(path, content, "utf-8");
 }

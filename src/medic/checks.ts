@@ -3,6 +3,7 @@
  */
 import { getDb } from "../db.js";
 import { getMaxRoleTimeoutSeconds } from "../installer/install.js";
+import { readPositiveIntEnv } from "../lib/env-int.js";
 
 export type MedicSeverity = "info" | "warning" | "critical";
 export type MedicActionType =
@@ -27,14 +28,6 @@ export interface MedicFinding {
 // ── Check: Stuck Steps ──────────────────────────────────────────────
 
 const MAX_ROLE_TIMEOUT_MS = (getMaxRoleTimeoutSeconds() + 5 * 60) * 1000;
-
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name]?.trim();
-  if (!raw) return fallback;
-  const parsed = parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
 
 const MEDIC_STUCK_WARNING_SECONDS = readPositiveIntEnv(
   "SHIPPULSE_MEDIC_STUCK_WARNING_SECONDS",

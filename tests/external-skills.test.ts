@@ -12,6 +12,7 @@ describe("External skill installation", () => {
   let tmpDir: string;
   let fakeHome: string;
   let origHome: string;
+  let origStateDir: string | undefined;
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "shippulse-skill-test-"));
@@ -29,10 +30,14 @@ describe("External skill installation", () => {
     );
     origHome = process.env.HOME || "";
     process.env.HOME = fakeHome;
+    origStateDir = process.env.OPENCLAW_STATE_DIR;
+    delete process.env.OPENCLAW_STATE_DIR;
   });
 
   afterEach(async () => {
     process.env.HOME = origHome;
+    if (origStateDir === undefined) delete process.env.OPENCLAW_STATE_DIR;
+    else process.env.OPENCLAW_STATE_DIR = origStateDir;
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -235,5 +240,46 @@ describe("External skill installation", () => {
     const plannerResult = results.find(r => r.id.includes("planner"))!;
     const plannerSkillPath = path.join(plannerResult.workspaceDir, "skills", "agent-browser");
     await assert.rejects(fs.access(plannerSkillPath), "Planner should not have agent-browser skill");
+  });
+
+  it("resolves external skills under OPENCLAW_STATE_DIR", async () => {
+    const stateDir = path.join(tmpDir, "custom-openclaw");
+    process.env.OPENCLAW_STATE_DIR = stateDir;
+    await fs.mkdir(path.join(stateDir, "workspace", "skills", "state-skill"), { recursive: true });
+    await fs.writeFile(
+      path.join(stateDir, "workspace", "skills", "state-skill", "SKILL.md"),
+      "# State Skill\nFrom OPENCLAW_STATE_DIR"
+    );
+
+    const mod = await import("../dist/installer/agent-provision.js");
+    const workflowDir = path.join(tmpDir, "workflow-state");
+    await fs.mkdir(workflowDir, { recursive: true });
+
+    const workflow = {
+      id: "test-state-wf",
+      name: "Test",
+      steps: [],
+      agents: [
+        {
+          id: "verifier",
+          role: "verify",
+          workspace: {
+            baseDir: "agents/verifier",
+            skills: ["state-skill"],
+            files: {},
+          },
+        },
+      ],
+    };
+
+    const results = await mod.provisionAgents({
+      workflow: workflow as any,
+      workflowDir,
+      installSkill: true,
+    });
+
+    const skillDest = path.join(results[0].workspaceDir, "skills", "state-skill", "SKILL.md");
+    const content = await fs.readFile(skillDest, "utf-8");
+    assert.ok(content.includes("From OPENCLAW_STATE_DIR"));
   });
 });

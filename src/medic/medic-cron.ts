@@ -10,13 +10,13 @@ const MEDIC_EVERY_MS = 5 * 60 * 1000; // 5 minutes
 const MEDIC_MODEL = "default";
 const MEDIC_TIMEOUT_SECONDS = 120;
 
-function buildMedicPrompt(): string {
+export function buildMedicPrompt(): string {
   const cli = resolveShipPulseCli();
   return `You are the ShipPulse Medic — a health watchdog for workflow runs.
 
 Run the medic check:
 \`\`\`
-node ${cli} medic run
+node "${cli}" medic run
 \`\`\`
 
 If the output says "All clear", reply HEARTBEAT_OK and stop.

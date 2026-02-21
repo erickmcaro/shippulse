@@ -40,4 +40,11 @@ describe("buildWorkPrompt", () => {
     assert.ok(!p1.includes("step claim"));
     assert.ok(!p2.includes("step claim"));
   });
+
+  it("uses a unique temp output file to avoid cross-agent /tmp collisions", () => {
+    const prompt = buildWorkPrompt("feature-dev", "developer");
+    assert.ok(prompt.includes("mktemp /tmp/shippulse-step-output.XXXXXX"));
+    assert.ok(!prompt.includes("mktemp /tmp/shippulse-step-output.XXXXXX.txt"));
+    assert.ok(prompt.includes("rm -f \"$OUTPUT_FILE\""));
+  });
 });

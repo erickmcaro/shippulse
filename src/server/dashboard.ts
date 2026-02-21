@@ -1,11 +1,11 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { getDb } from "../db.js";
-import { resolveBundledWorkflowsDir } from "../installer/paths.js";
+import { resolveBundledWorkflowsDir, resolveShipPulseRoot } from "../installer/paths.js";
+import { readPositiveIntEnv } from "../lib/env-int.js";
 import YAML from "yaml";
 import { runWorkflow } from "../installer/run.js";
 import { getPlanningArtifacts } from "../installer/planning-artifacts.js";
@@ -22,7 +22,7 @@ import { getMedicStatus, getRecentMedicChecks } from "../medic/medic.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_HOST = "127.0.0.1";
-const DASHBOARD_TOKEN_FILE = path.join(os.homedir(), ".openclaw", "shippulse", "dashboard.token");
+const DASHBOARD_TOKEN_FILE = path.join(resolveShipPulseRoot(), "dashboard.token");
 const DASHBOARD_CSP = [
   "default-src 'self'",
   "img-src 'self' data:",
@@ -52,14 +52,6 @@ type StuckSignal = {
   causeHint?: string;
 };
 
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name]?.trim();
-  if (!raw) return fallback;
-  const parsed = parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
-
 const STUCK_WARNING_SECONDS = readPositiveIntEnv("SHIPPULSE_STUCK_WARNING_SECONDS", 180);
 const STUCK_CRITICAL_SECONDS = readPositiveIntEnv(
   "SHIPPULSE_STUCK_CRITICAL_SECONDS",
@@ -70,6 +62,15 @@ const emittedStuckSignals = new Map<string, { level: StuckLevel; emittedAt: numb
 
 let cachedMutationToken: string | null = null;
 let cachedMutationTokenSource: "env" | "file" | "generated" | null = null;
+
+function parsePositiveIntQuery(value: string | null, fallback: number, max: number): number {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!/^[0-9]+$/.test(trimmed)) return fallback;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
 
 function getDashboardMutationToken(): string {
   const envToken = process.env.SHIPPULSE_DASHBOARD_TOKEN?.trim();
@@ -135,23 +136,47 @@ type NextPhaseSuggestion = {
   taskDraft: string;
 };
 
-function loadWorkflows(): WorkflowDef[] {
-  const dir = resolveBundledWorkflowsDir();
+function normalizeWorkflowText(value: unknown, fallback: string): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return fallback;
+}
+
+export function loadWorkflowsFromDir(dir: string): WorkflowDef[] {
   const results: WorkflowDef[] = [];
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const ymlPath = path.join(dir, entry.name, "workflow.yml");
       if (!fs.existsSync(ymlPath)) continue;
-      const parsed = YAML.parse(fs.readFileSync(ymlPath, "utf-8"));
-      results.push({
-        id: parsed.id ?? entry.name,
-        name: parsed.name ?? entry.name,
-        steps: (parsed.steps ?? []).map((s: any) => ({ id: s.id, agent: s.agent })),
-      });
+      try {
+        const parsed = YAML.parse(fs.readFileSync(ymlPath, "utf-8")) as {
+          id?: unknown;
+          name?: unknown;
+          steps?: Array<{ id?: unknown; agent?: unknown }>;
+        } | null;
+        if (!parsed || typeof parsed !== "object") continue;
+        const fallbackName = entry.name.trim() || entry.name;
+        results.push({
+          id: normalizeWorkflowText(parsed.id, fallbackName),
+          name: normalizeWorkflowText(parsed.name, fallbackName),
+          steps: Array.isArray(parsed.steps)
+            ? parsed.steps.map((s) => ({ id: String(s?.id ?? ""), agent: String(s?.agent ?? "") }))
+            : [],
+        });
+      } catch {
+        // Skip malformed workflow files; don't hide other valid workflows.
+        continue;
+      }
     }
   } catch { /* empty */ }
   return results;
+}
+
+function loadWorkflows(): WorkflowDef[] {
+  return loadWorkflowsFromDir(resolveBundledWorkflowsDir());
 }
 
 function parseRunContext(run: RunInfo): Record<string, unknown> {
@@ -543,10 +568,7 @@ export function startDashboardWithDeps(port = 3333, deps?: DashboardDeps): http.
 
     const eventsMatch = p.match(/^\/api\/runs\/([^/]+)\/events$/);
     if (eventsMatch) {
-      const requested = parseInt(url.searchParams.get("limit") ?? "200", 10);
-      const limit = Number.isFinite(requested)
-        ? Math.max(1, Math.min(requested, 5000))
-        : 200;
+      const limit = parsePositiveIntQuery(url.searchParams.get("limit"), 200, 5000);
       return json(res, getRunEvents(eventsMatch[1], limit));
     }
 
@@ -670,7 +692,9 @@ export function startDashboardWithDeps(port = 3333, deps?: DashboardDeps): http.
       if (!requireMutationAuth(req, res)) return;
       const result = await retryFailedStoryFn(retryStoryMatch[1]);
       if (result.status === "ok") return json(res, result);
-      if (result.status === "already_done" || result.status === "no_failed_story") return json(res, result, 409);
+      if (result.status === "already_done" || result.status === "no_failed_story" || result.status === "invalid_state") {
+        return json(res, result, 409);
+      }
       return json(res, result, 404);
     }
 
@@ -750,7 +774,7 @@ export function startDashboardWithDeps(port = 3333, deps?: DashboardDeps): http.
     }
 
     if (p === "/api/medic/checks") {
-      const limit = parseInt(url.searchParams.get("limit") ?? "20", 10);
+      const limit = parsePositiveIntQuery(url.searchParams.get("limit"), 20, 500);
       return json(res, getRecentMedicChecks(limit));
     }
 

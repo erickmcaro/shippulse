@@ -5,6 +5,14 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKFLOW_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
+function normalizeEnvPath(input: string): string {
+  if (input === "~") return os.homedir();
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
+    return path.resolve(path.join(os.homedir(), input.slice(2)));
+  }
+  return path.resolve(input);
+}
+
 function ensurePathWithinRoot(root: string, candidate: string, label: string): string {
   const resolvedRoot = path.resolve(root);
   const resolvedCandidate = path.resolve(candidate);
@@ -45,7 +53,7 @@ export function resolveBundledSeedDir(): string {
 export function resolveOpenClawStateDir(): string {
   const env = process.env.OPENCLAW_STATE_DIR?.trim();
   if (env) {
-    return env;
+    return normalizeEnvPath(env);
   }
   return path.join(os.homedir(), ".openclaw");
 }
@@ -53,7 +61,7 @@ export function resolveOpenClawStateDir(): string {
 export function resolveOpenClawConfigPath(): string {
   const env = process.env.OPENCLAW_CONFIG_PATH?.trim();
   if (env) {
-    return env;
+    return normalizeEnvPath(env);
   }
   return path.join(resolveOpenClawStateDir(), "openclaw.json");
 }

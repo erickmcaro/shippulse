@@ -1,11 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { getDb } from "../db.js";
+import { resolveShipPulseRoot } from "./paths.js";
 
-const EVENTS_DIR = path.join(os.homedir(), ".openclaw", "shippulse");
+const EVENTS_DIR = resolveShipPulseRoot();
 const EVENTS_FILE = path.join(EVENTS_DIR, "events.jsonl");
 const MAX_EVENTS_SIZE = 10 * 1024 * 1024; // 10MB
+
+function normalizeLimit(limit: number, fallback: number, max: number): number {
+  if (!Number.isFinite(limit) || !Number.isInteger(limit)) return fallback;
+  if (limit <= 0) return fallback;
+  return Math.min(limit, max);
+}
 
 export type EventType =
   | "run.started" | "run.completed" | "run.failed" | "run.cancelled"
@@ -136,15 +142,17 @@ function fireWebhook(evt: ShipPulseEvent): void {
 
 // Read recent events (last N)
 export function getRecentEvents(limit = 50): ShipPulseEvent[] {
+  const normalizedLimit = normalizeLimit(limit, 50, 5000);
   const events = readAllEvents();
-  return events.slice(-limit);
+  return events.slice(-normalizedLimit);
 }
 
 // Read events for a specific run (supports prefix match)
 export function getRunEvents(runId: string, limit = 200): ShipPulseEvent[] {
   const query = runId.trim();
   if (!query) return [];
+  const normalizedLimit = normalizeLimit(limit, 200, 5000);
   const events = readAllEvents();
   const filtered = events.filter((evt) => evt.runId === query || evt.runId.startsWith(query));
-  return filtered.slice(-limit);
+  return filtered.slice(-normalizedLimit);
 }

@@ -1,9 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { resolveShipPulseRoot } from "./installer/paths.js";
 
-const DB_DIR = path.join(os.homedir(), ".openclaw", "shippulse");
+const DB_DIR = resolveShipPulseRoot();
 const DB_PATH = path.join(DB_DIR, "shippulse.db");
 
 let _db: DatabaseSync | null = null;
@@ -17,6 +17,17 @@ export function getDb(): DatabaseSync {
   _db.exec("PRAGMA foreign_keys=ON");
   migrate(_db);
   return _db;
+}
+
+export function closeDb(): void {
+  if (!_db) return;
+  try {
+    _db.close();
+  } catch {
+    // best-effort shutdown for uninstall/teardown paths
+  } finally {
+    _db = null;
+  }
 }
 
 function resequenceRunNumbers(db: DatabaseSync): void {

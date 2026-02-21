@@ -106,10 +106,10 @@ export async function provisionAgents(params: {
  * Returns the path if found, or null if not found.
  */
 async function resolveExternalSkillSource(skillName: string): Promise<string | null> {
-  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const stateDir = resolveOpenClawStateDir();
   const candidates = [
-    path.join(home, ".openclaw", "workspace", "skills", skillName),
-    path.join(home, ".openclaw", "skills", skillName),
+    path.join(stateDir, "workspace", "skills", skillName),
+    path.join(stateDir, "skills", skillName),
   ];
   for (const candidate of candidates) {
     try {

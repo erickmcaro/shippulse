@@ -82,6 +82,24 @@ function quoteForShell(value: string): string {
   return `"${value.replace(/(["\\$`])/g, "\\$1")}"`;
 }
 
+function parseDashboardPort(raw: string | undefined): number | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 65535) return null;
+  return parsed;
+}
+
+function parsePositiveIntArg(raw: string | undefined, fallback: number, max: number): number {
+  if (typeof raw !== "string") return fallback;
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) return fallback;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
 function printEvents(events: ShipPulseEvent[]): void {
   if (events.length === 0) { console.log("No events yet."); return; }
   for (const evt of events) {
@@ -265,18 +283,23 @@ async function main() {
     // start (explicit or implicit)
     let port = 3333;
     const portIdx = args.indexOf("--port");
-    if (portIdx !== -1 && args[portIdx + 1]) {
-      port = parseInt(args[portIdx + 1], 10) || 3333;
+    const flagPort = portIdx !== -1 ? parseDashboardPort(args[portIdx + 1]) : null;
+    if (flagPort !== null) {
+      port = flagPort;
     } else if (sub && sub !== "start" && !sub.startsWith("-")) {
       // legacy: shippulse dashboard 4000
-      const parsed = parseInt(sub, 10);
-      if (!Number.isNaN(parsed)) port = parsed;
+      const parsed = parseDashboardPort(sub);
+      if (parsed !== null) port = parsed;
     }
 
     if (isRunning().running) {
       const status = getDaemonStatus();
       console.log(`Dashboard already running (PID ${status?.pid})`);
-      console.log(`  http://127.0.0.1:${port}`);
+      if (status?.port) {
+        console.log(`  http://127.0.0.1:${status.port}`);
+      } else {
+        console.log("  Port unknown (missing daemon metadata).");
+      }
       return;
     }
 
@@ -344,7 +367,7 @@ async function main() {
     }
 
     if (action === "log") {
-      const limit = target ? parseInt(target, 10) || 20 : 20;
+      const limit = parsePositiveIntArg(target, 20, 500);
       const checks = getRecentMedicChecks(limit);
       if (checks.length === 0) {
         console.log("No medic checks recorded yet.");
@@ -386,7 +409,7 @@ async function main() {
 
     if (action === "search") {
       const topIdx = args.indexOf("--top");
-      const top = topIdx !== -1 && args[topIdx + 1] ? parseInt(args[topIdx + 1], 10) : 8;
+      const top = parsePositiveIntArg(topIdx !== -1 ? args[topIdx + 1] : undefined, 8, 50);
       const query = args.slice(2).filter((a, i, arr) => {
         if (a === "--top") return false;
         if (arr[i - 1] === "--top") return false;
@@ -483,19 +506,13 @@ async function main() {
 
   if (group === "logs") {
     const arg = args[1];
-    if (arg && !/^\d+$/.test(arg)) {
-      // Looks like a run ID (or prefix)
-      const events = getRunEvents(arg);
-      if (events.length === 0) {
-        console.log(`No events found for run matching "${arg}".`);
-      } else {
-        printEvents(events);
-      }
-      return;
-    }
-    // Also support "shippulse logs #3" to show events for run number 3
+    // Support "shippulse logs #3" to show events for run number 3
     if (arg && /^#\d+$/.test(arg)) {
-      const runNum = parseInt(arg.slice(1), 10);
+      const runNum = parsePositiveIntArg(arg.slice(1), 0, Number.MAX_SAFE_INTEGER);
+      if (runNum <= 0) {
+        console.log(`Invalid run number: ${arg}.`);
+        return;
+      }
       const db2 = (await import("../db.js")).getDb();
       const r = db2.prepare("SELECT id FROM runs WHERE run_number = ?").get(runNum) as { id: string } | undefined;
       if (r) {
@@ -507,7 +524,17 @@ async function main() {
       }
       return;
     }
-    const limit = parseInt(arg, 10) || 50;
+    if (arg && !/^\d+$/.test(arg)) {
+      // Looks like a run ID (or prefix)
+      const events = getRunEvents(arg);
+      if (events.length === 0) {
+        console.log(`No events found for run matching "${arg}".`);
+      } else {
+        printEvents(events);
+      }
+      return;
+    }
+    const limit = parsePositiveIntArg(arg, 50, 5000);
     const events = getRecentEvents(limit);
     printEvents(events);
     return;

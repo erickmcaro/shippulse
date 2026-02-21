@@ -71,6 +71,11 @@ export function removeCliSymlink(): void {
   const linkPath = join(home, ".local", "bin", BINARY_NAME);
   if (existsSync(linkPath)) {
     try {
+      const stats = lstatSync(linkPath);
+      if (!stats.isSymbolicLink()) {
+        console.warn(`  ⚠ ${linkPath} exists and is not a symlink — leaving it untouched`);
+        return;
+      }
       unlinkSync(linkPath);
       console.log(`  ✓ Removed symlink ${linkPath}`);
     } catch {

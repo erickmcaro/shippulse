@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
-import { resolveOpenClawStateDir } from "../installer/paths.js";
+import { resolveOpenClawStateDir, resolveShipPulseRoot } from "../installer/paths.js";
 
 export type KnowledgeDoc = {
   id: string;
@@ -85,7 +84,7 @@ export type SearchResult = {
   withEmbeddings: boolean;
 };
 
-const DEFAULT_INDEX_PATH = path.join(os.homedir(), ".openclaw", "shippulse", "kb-index.json");
+const DEFAULT_INDEX_PATH = path.join(resolveShipPulseRoot(), "kb-index.json");
 const DEFAULT_EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const DEFAULT_OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";

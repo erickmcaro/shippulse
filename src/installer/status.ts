@@ -33,27 +33,47 @@ export type WorkflowStatusResult =
   | { status: "ok"; run: RunInfo; steps: StepInfo[] }
   | { status: "not_found"; message: string };
 
+function parseRunNumberQuery(query: string): number | null {
+  const trimmed = query.trim();
+  const numeric = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  if (!/^[0-9]+$/.test(numeric)) return null;
+  const parsed = Number.parseInt(numeric, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function findRunByIdPrefix(query: string): RunInfo | undefined {
+  const db = getDb();
+  const trimmed = query.trim();
+  if (!trimmed) return undefined;
+  return db
+    .prepare("SELECT * FROM runs WHERE substr(id, 1, length(?)) = ? ORDER BY created_at DESC LIMIT 1")
+    .get(trimmed, trimmed) as RunInfo | undefined;
+}
+
 export function getWorkflowStatus(query: string): WorkflowStatusResult {
   const db = getDb();
+  const trimmedQuery = query.trim();
 
-  // Try run number first (pure digits)
+  // Try run number first (supports both "7" and "#7").
   let run: RunInfo | undefined;
-  if (/^\d+$/.test(query)) {
-    run = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(parseInt(query, 10)) as RunInfo | undefined;
+  const runNumber = parseRunNumberQuery(trimmedQuery);
+  if (runNumber !== null) {
+    run = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(runNumber) as RunInfo | undefined;
   }
 
   // Try exact task match, then substring match
   if (!run) {
-    run = db.prepare("SELECT * FROM runs WHERE LOWER(task) = LOWER(?) ORDER BY created_at DESC LIMIT 1").get(query) as RunInfo | undefined;
+    run = db.prepare("SELECT * FROM runs WHERE LOWER(task) = LOWER(?) ORDER BY created_at DESC LIMIT 1").get(trimmedQuery) as RunInfo | undefined;
   }
 
-  if (!run) {
-    run = db.prepare("SELECT * FROM runs WHERE LOWER(task) LIKE '%' || LOWER(?) || '%' ORDER BY created_at DESC LIMIT 1").get(query) as RunInfo | undefined;
+  if (!run && trimmedQuery.length > 0) {
+    run = db.prepare("SELECT * FROM runs WHERE instr(LOWER(task), LOWER(?)) > 0 ORDER BY created_at DESC LIMIT 1").get(trimmedQuery) as RunInfo | undefined;
   }
 
   // Also try matching by run ID (prefix or full)
   if (!run) {
-    run = db.prepare("SELECT * FROM runs WHERE id LIKE ? || '%' ORDER BY created_at DESC LIMIT 1").get(query) as RunInfo | undefined;
+    run = findRunByIdPrefix(trimmedQuery);
   }
 
   if (!run) {
@@ -121,15 +141,17 @@ export type StopWorkflowResult =
 
 function findRunByQuery(query: string): RunInfo | undefined {
   const db = getDb();
+  const trimmedQuery = query.trim();
 
-  if (/^\d+$/.test(query)) {
-    const byNumber = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(parseInt(query, 10)) as RunInfo | undefined;
+  const runNumber = parseRunNumberQuery(trimmedQuery);
+  if (runNumber !== null) {
+    const byNumber = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(runNumber) as RunInfo | undefined;
     if (byNumber) return byNumber;
   }
 
-  let run = db.prepare("SELECT * FROM runs WHERE id = ?").get(query) as RunInfo | undefined;
+  let run = db.prepare("SELECT * FROM runs WHERE id = ?").get(trimmedQuery) as RunInfo | undefined;
   if (!run) {
-    run = db.prepare("SELECT * FROM runs WHERE id LIKE ? || '%' ORDER BY created_at DESC LIMIT 1").get(query) as RunInfo | undefined;
+    run = findRunByIdPrefix(trimmedQuery);
   }
   return run;
 }
@@ -151,12 +173,12 @@ function resetDownstreamForResume(runId: string, failedStepId: string): number {
   if (!failedStep) return 0;
 
   const rows = db.prepare(
-    "SELECT id FROM steps WHERE run_id = ? AND step_index > ? AND status IN ('running', 'pending', 'done')",
+    "SELECT id FROM steps WHERE run_id = ? AND step_index > ? AND status IN ('failed', 'running', 'pending', 'done')",
   ).all(runId, failedStep.step_index) as Array<{ id: string }>;
   if (rows.length === 0) return 0;
 
   const resetStmt = db.prepare(
-    "UPDATE steps SET status = 'waiting', output = NULL, current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?",
+    "UPDATE steps SET status = 'waiting', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?",
   );
   for (const row of rows) {
     resetStmt.run(row.id);
@@ -176,7 +198,7 @@ export async function stopWorkflow(query: string): Promise<StopWorkflowResult> {
     };
   }
 
-  if (run.status === "completed" || run.status === "cancelled") {
+  if (run.status !== "running") {
     return {
       status: "already_done",
       message: `Run ${run.id.slice(0, 8)} is already "${run.status}".`,
@@ -191,6 +213,18 @@ export async function stopWorkflow(query: string): Promise<StopWorkflowResult> {
     "UPDATE steps SET status = 'failed', output = 'Cancelled by user', updated_at = datetime('now') WHERE run_id = ? AND status IN ('waiting', 'pending', 'running')"
   ).run(run.id);
   const cancelledSteps = Number(result.changes);
+
+  // Stories can also be in-flight when a run is cancelled (loop workflows).
+  db.prepare(
+    `UPDATE stories
+     SET status = 'failed',
+         output = CASE
+           WHEN output IS NULL OR output = '' THEN 'Cancelled by user'
+           ELSE output
+         END,
+         updated_at = datetime('now')
+     WHERE run_id = ? AND status IN ('pending', 'running')`
+  ).run(run.id);
 
   // Clean up cron jobs if no other active runs
   let warning: string | undefined;
@@ -253,8 +287,8 @@ export async function resumeWorkflow(query: string): Promise<ResumeWorkflowResul
   }
 
   const failedStep = db.prepare(
-    "SELECT id, step_id, type, current_story_id FROM steps WHERE run_id = ? AND status = 'failed' ORDER BY step_index ASC LIMIT 1"
-  ).get(run.id) as { id: string; step_id: string; type: string; current_story_id: string | null } | undefined;
+    "SELECT id, step_id, step_index, type, current_story_id FROM steps WHERE run_id = ? AND status = 'failed' ORDER BY step_index ASC LIMIT 1"
+  ).get(run.id) as { id: string; step_id: string; step_index: number; type: string; current_story_id: string | null } | undefined;
 
   if (!failedStep) {
     return {
@@ -263,8 +297,19 @@ export async function resumeWorkflow(query: string): Promise<ResumeWorkflowResul
     };
   }
 
+  const downstreamLoopResetNeeded = (
+    db.prepare(
+      "SELECT COUNT(*) AS cnt FROM steps WHERE run_id = ? AND step_index > ? AND type = 'loop' AND status IN ('failed', 'running', 'pending', 'done')"
+    ).get(run.id, failedStep.step_index) as { cnt: number }
+  ).cnt > 0;
+
   const downstreamReset = resetDownstreamForResume(run.id, failedStep.id);
   if (downstreamReset > 0) {
+    if (downstreamLoopResetNeeded) {
+      db.prepare(
+        "UPDATE stories SET status = 'pending', output = NULL, retry_count = 0, updated_at = datetime('now') WHERE run_id = ? AND status IN ('pending', 'failed', 'running', 'done')"
+      ).run(run.id);
+    }
     emitEvent({
       ts: new Date().toISOString(),
       event: "step.integrity",
@@ -281,7 +326,7 @@ export async function resumeWorkflow(query: string): Promise<ResumeWorkflowResul
     ).get(run.id) as { id: string } | undefined;
     if (failedStory) {
       db.prepare(
-        "UPDATE stories SET status = 'pending', updated_at = datetime('now') WHERE id = ?"
+        "UPDATE stories SET status = 'pending', output = NULL, updated_at = datetime('now') WHERE id = ?"
       ).run(failedStory.id);
     }
     db.prepare(
@@ -299,30 +344,30 @@ export async function resumeWorkflow(query: string): Promise<ResumeWorkflowResul
       const lc = JSON.parse(loopStep.loop_config) as { verifyEach?: boolean; verifyStep?: string };
       if (lc.verifyEach && lc.verifyStep === failedStep.step_id) {
         db.prepare(
-          "UPDATE steps SET status = 'pending', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+          "UPDATE steps SET status = 'pending', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
         ).run(loopStep.id);
         db.prepare(
-          "UPDATE steps SET status = 'waiting', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+          "UPDATE steps SET status = 'waiting', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
         ).run(failedStep.id);
         db.prepare(
-          "UPDATE stories SET status = 'pending', updated_at = datetime('now') WHERE run_id = ? AND status = 'failed'"
+          "UPDATE stories SET status = 'pending', output = NULL, updated_at = datetime('now') WHERE run_id = ? AND status = 'failed'"
         ).run(run.id);
         message = `Resumed run ${run.id.slice(0, 8)} — loop step reset to pending and verify step to waiting.`;
       } else {
         db.prepare(
-          "UPDATE steps SET status = 'pending', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+          "UPDATE steps SET status = 'pending', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
         ).run(failedStep.id);
         message = `Resumed run ${run.id.slice(0, 8)} from step "${failedStep.step_id}".`;
       }
     } catch {
       db.prepare(
-        "UPDATE steps SET status = 'pending', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+        "UPDATE steps SET status = 'pending', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
       ).run(failedStep.id);
       message = `Resumed run ${run.id.slice(0, 8)} from step "${failedStep.step_id}".`;
     }
   } else {
     db.prepare(
-      "UPDATE steps SET status = 'pending', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+      "UPDATE steps SET status = 'pending', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
     ).run(failedStep.id);
     message = `Resumed run ${run.id.slice(0, 8)} from step "${failedStep.step_id}".`;
   }
@@ -348,6 +393,7 @@ export type RetryFailedStoryResult =
   | { status: "ok"; runId: string; workflowId: string; storyId: string; message: string; warning?: string }
   | { status: "not_found"; message: string }
   | { status: "already_done"; message: string }
+  | { status: "invalid_state"; message: string }
   | { status: "no_failed_story"; message: string };
 
 export async function retryFailedStory(query: string): Promise<RetryFailedStoryResult> {
@@ -375,29 +421,60 @@ export async function retryFailedStory(query: string): Promise<RetryFailedStoryR
     };
   }
 
-  db.prepare(
-    "UPDATE stories SET status = 'pending', retry_count = 0, updated_at = datetime('now') WHERE id = ?"
-  ).run(story.id);
-
   const loopStep = db.prepare(
     "SELECT id, step_id, loop_config FROM steps WHERE run_id = ? AND type = 'loop' ORDER BY step_index ASC LIMIT 1"
   ).get(run.id) as { id: string; step_id: string; loop_config: string | null } | undefined;
 
-  if (loopStep) {
-    db.prepare(
-      "UPDATE steps SET status = 'pending', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
-    ).run(loopStep.id);
-    if (loopStep.loop_config) {
-      try {
-        const lc = JSON.parse(loopStep.loop_config) as { verifyEach?: boolean; verifyStep?: string };
-        if (lc.verifyEach && lc.verifyStep) {
-          db.prepare(
-            "UPDATE steps SET status = 'waiting', current_story_id = NULL, retry_count = 0, updated_at = datetime('now') WHERE run_id = ? AND step_id = ?"
-          ).run(run.id, lc.verifyStep);
-        }
-      } catch {
-        // best-effort
+  if (!loopStep) {
+    return {
+      status: "invalid_state",
+      message: `Run ${run.id.slice(0, 8)} has failed stories but no loop step to retry.`,
+    };
+  }
+
+  let retryLoopConfig: { verifyEach?: boolean; verifyStep?: string } | null = null;
+  if (loopStep.loop_config) {
+    try {
+      retryLoopConfig = JSON.parse(loopStep.loop_config) as { verifyEach?: boolean; verifyStep?: string };
+    } catch {
+      retryLoopConfig = null;
+    }
+  }
+  const allowedVerifyStep =
+    retryLoopConfig?.verifyEach && retryLoopConfig.verifyStep
+      ? retryLoopConfig.verifyStep
+      : null;
+
+  const otherFailedStep = allowedVerifyStep
+    ? (db.prepare(
+      "SELECT step_id FROM steps WHERE run_id = ? AND status = 'failed' AND id <> ? AND step_id <> ? ORDER BY step_index ASC LIMIT 1"
+    ).get(run.id, loopStep.id, allowedVerifyStep) as { step_id: string } | undefined)
+    : (db.prepare(
+      "SELECT step_id FROM steps WHERE run_id = ? AND status = 'failed' AND id <> ? ORDER BY step_index ASC LIMIT 1"
+    ).get(run.id, loopStep.id) as { step_id: string } | undefined);
+  if (otherFailedStep) {
+    return {
+      status: "invalid_state",
+      message: `Run ${run.id.slice(0, 8)} has failed step "${otherFailedStep.step_id}" outside the story loop; use resume instead.`,
+    };
+  }
+
+  db.prepare(
+    "UPDATE stories SET status = 'pending', output = NULL, retry_count = 0, updated_at = datetime('now') WHERE id = ?"
+  ).run(story.id);
+
+  db.prepare(
+    "UPDATE steps SET status = 'pending', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE id = ?"
+  ).run(loopStep.id);
+  if (retryLoopConfig) {
+    try {
+      if (retryLoopConfig.verifyEach && retryLoopConfig.verifyStep) {
+        db.prepare(
+          "UPDATE steps SET status = 'waiting', output = NULL, current_story_id = NULL, retry_count = 0, abandoned_count = 0, updated_at = datetime('now') WHERE run_id = ? AND step_id = ?"
+        ).run(run.id, retryLoopConfig.verifyStep);
       }
+    } catch {
+      // best-effort
     }
   }
 

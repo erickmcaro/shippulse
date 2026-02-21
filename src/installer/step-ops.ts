@@ -2,11 +2,12 @@ import { getDb } from "../db.js";
 import type { LoopConfig, Story } from "./types.js";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import crypto from "node:crypto";
 import { execSync, execFileSync } from "node:child_process";
 import type { DatabaseSync } from "node:sqlite";
+import JSON5 from "json5";
 import { teardownWorkflowCronsIfIdle } from "./agent-cron.js";
+import { resolveOpenClawConfigPath } from "./paths.js";
 import { emitEvent } from "./events.js";
 import { logger } from "../lib/logger.js";
 import { getMaxRoleTimeoutSeconds } from "./install.js";
@@ -247,8 +248,10 @@ function findDownstreamConflict(db: DatabaseSync, runId: string, stepIndex: numb
  */
 function getAgentWorkspacePath(agentId: string): string | null {
   try {
-    const configPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
-    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const configPath = resolveOpenClawConfigPath();
+    const config = JSON5.parse(fs.readFileSync(configPath, "utf-8")) as {
+      agents?: { list?: Array<{ id?: string; workspace?: string }> };
+    };
     const agent = config.agents?.list?.find((a: any) => a.id === agentId);
     return agent?.workspace ?? null;
   } catch {
@@ -571,7 +574,12 @@ export function cleanupAbandonedSteps(): void {
 
   // Find running steps that haven't been updated recently
   const abandonedSteps = db.prepare(
-    "SELECT id, step_id, run_id, retry_count, max_retries, type, current_story_id, loop_config, abandoned_count FROM steps WHERE status = 'running' AND (julianday('now') - julianday(updated_at)) * 86400000 > ?"
+    `SELECT s.id, s.step_id, s.run_id, s.retry_count, s.max_retries, s.type, s.current_story_id, s.loop_config, s.abandoned_count
+     FROM steps s
+     JOIN runs r ON r.id = s.run_id
+     WHERE s.status = 'running'
+       AND r.status = 'running'
+       AND (julianday('now') - julianday(s.updated_at)) * 86400000 > ?`
   ).all(thresholdMs) as { id: string; step_id: string; run_id: string; retry_count: number; max_retries: number; type: string; current_story_id: string | null; loop_config: string | null; abandoned_count: number }[];
 
   for (const step of abandonedSteps) {
@@ -645,7 +653,12 @@ export function cleanupAbandonedSteps(): void {
   // Reset running stories that are abandoned — don't touch "done" stories
   // Don't increment retry_count for abandonment; only explicit failStep() counts against retries
   const abandonedStories = db.prepare(
-    "SELECT id, retry_count, max_retries, run_id FROM stories WHERE status = 'running' AND (julianday('now') - julianday(updated_at)) * 86400000 > ?"
+    `SELECT st.id, st.retry_count, st.max_retries, st.run_id
+     FROM stories st
+     JOIN runs r ON r.id = st.run_id
+     WHERE st.status = 'running'
+       AND r.status = 'running'
+       AND (julianday('now') - julianday(st.updated_at)) * 86400000 > ?`
   ).all(thresholdMs) as { id: string; retry_count: number; max_retries: number; run_id: string }[];
 
   for (const story of abandonedStories) {
@@ -683,11 +696,93 @@ export function cleanupAbandonedSteps(): void {
  * Returns 'true' or 'false' as a string for template context.
  */
 export function computeHasFrontendChanges(repo: string, branch: string): string {
+  function normalizeBranchRef(input: string): string {
+    const trimmed = input.trim();
+    if (trimmed.startsWith("refs/heads/")) return trimmed.slice("refs/heads/".length);
+    if (trimmed.startsWith("refs/remotes/origin/")) return trimmed.slice("refs/remotes/origin/".length);
+    if (trimmed.startsWith("origin/")) return trimmed.slice("origin/".length);
+    return trimmed;
+  }
+
+  function readGitOutput(args: string[]): string | null {
+    try {
+      const out = execFileSync("git", args, {
+        cwd: repo,
+        encoding: "utf-8",
+        timeout: 10_000,
+      });
+      const trimmed = out.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function gitRefExists(ref: string): boolean {
+    try {
+      execFileSync("git", ["rev-parse", "--verify", "--quiet", ref], {
+        cwd: repo,
+        stdio: "ignore",
+        timeout: 10_000,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function resolveDiffBase(targetBranch: string): string | null {
+    const candidates = ["main", "master", "trunk", "develop"];
+    for (const candidate of candidates) {
+      if (candidate === targetBranch) continue;
+      if (gitRefExists(`refs/heads/${candidate}`)) return candidate;
+    }
+    for (const candidate of candidates) {
+      if (candidate === targetBranch) continue;
+      if (gitRefExists(`refs/remotes/origin/${candidate}`)) return `origin/${candidate}`;
+    }
+
+    const remoteHead = readGitOutput(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+    if (remoteHead) {
+      const normalized = remoteHead.replace(/^origin\//, "");
+      if (normalized !== targetBranch && gitRefExists(`refs/remotes/origin/${normalized}`)) {
+        return `origin/${normalized}`;
+      }
+    }
+
+    const localBranches = readGitOutput(["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
+    if (localBranches) {
+      const alternatives = localBranches
+        .split("\n")
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0 && name !== targetBranch);
+      if (alternatives.length === 1 && gitRefExists(`refs/heads/${alternatives[0]}`)) {
+        return alternatives[0];
+      }
+    }
+
+    return null;
+  }
+
+  function resolveTargetBranchRef(targetBranch: string): string | null {
+    const normalized = normalizeBranchRef(targetBranch);
+    if (gitRefExists(`refs/heads/${normalized}`)) return normalized;
+    if (gitRefExists(`refs/remotes/origin/${normalized}`)) return `origin/${normalized}`;
+    if (gitRefExists(targetBranch)) return targetBranch;
+    return null;
+  }
+
   try {
-    const output = execFileSync("git", ["diff", "--name-only", `main..${branch}`], {
+    const targetRef = resolveTargetBranchRef(branch);
+    if (!targetRef) return "false";
+    const targetNameForBase = normalizeBranchRef(targetRef);
+    const diffBase = resolveDiffBase(targetNameForBase);
+    if (!diffBase) return "false";
+    const output = execFileSync("git", ["diff", "--name-only", `${diffBase}..${targetRef}`], {
       cwd: repo,
       encoding: "utf-8",
       timeout: 10_000,
+      stdio: ["ignore", "pipe", "ignore"],
     });
     const files = output.trim().split("\n").filter(f => f.length > 0);
     return isFrontendChange(files) ? "true" : "false";
@@ -768,7 +863,7 @@ export function claimStep(agentId: string): ClaimResult {
          FROM steps s
          JOIN runs r ON r.id = s.run_id
          WHERE s.agent_id = ? AND s.status = 'pending'
-           AND r.status NOT IN ('failed', 'cancelled')
+           AND r.status = 'running'
          ORDER BY s.step_index ASC
          LIMIT 1`
       ).get(agentId) as { id: string; step_id: string; run_id: string; input_template: string; type: string; loop_config: string | null } | undefined;
@@ -777,7 +872,7 @@ export function claimStep(agentId: string): ClaimResult {
 
       // Guard: don't claim work for terminal runs.
       const runStatus = db.prepare("SELECT status FROM runs WHERE id = ?").get(step.run_id) as { status: string } | undefined;
-      if (runStatus?.status === "failed" || runStatus?.status === "cancelled") return { found: false };
+      if (runStatus?.status !== "running") return { found: false };
       const workflowId = getWorkflowId(step.run_id);
 
       const monotonicGuard = checkMonotonicClaimGuard(db, step.run_id, step.id);
@@ -1003,14 +1098,35 @@ export function completeStep(stepId: string, output: string): { advanced: boolea
   const db = getDb();
 
   const step = db.prepare(
-    "SELECT id, run_id, step_id, step_index, type, loop_config, current_story_id FROM steps WHERE id = ?"
-  ).get(stepId) as { id: string; run_id: string; step_id: string; step_index: number; type: string; loop_config: string | null; current_story_id: string | null } | undefined;
+    "SELECT id, run_id, step_id, step_index, status, type, loop_config, current_story_id FROM steps WHERE id = ?"
+  ).get(stepId) as {
+    id: string;
+    run_id: string;
+    step_id: string;
+    step_index: number;
+    status: string;
+    type: string;
+    loop_config: string | null;
+    current_story_id: string | null;
+  } | undefined;
 
   if (!step) throw new Error(`Step not found: ${stepId}`);
 
-  // Guard: don't process completions for failed runs
+  // Guard: don't process completions for failed/cancelled runs.
   const runCheck = db.prepare("SELECT status FROM runs WHERE id = ?").get(step.run_id) as { status: string } | undefined;
-  if (runCheck?.status === "failed") {
+  const runStatus = runCheck?.status;
+  if (!runStatus || runStatus === "failed" || runStatus === "cancelled") {
+    return { advanced: false, runCompleted: false };
+  }
+  const replayCompletedRun = runStatus === "completed";
+
+  // Guard: only running steps can complete while a run is active.
+  // For completed runs, allow replay upserts from already-done steps only.
+  if (replayCompletedRun) {
+    if (step.status !== "done") {
+      return { advanced: false, runCompleted: false };
+    }
+  } else if (step.status !== "running") {
     return { advanced: false, runCompleted: false };
   }
 
@@ -1056,6 +1172,14 @@ export function completeStep(stepId: string, output: string): { advanced: boolea
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     failStep(step.id, `Output validation failed for "${step.step_id}": ${message}`);
+    return { advanced: false, runCompleted: false };
+  }
+
+  // Allow idempotent output/story upserts on completed runs, but never mutate pipeline state.
+  if (replayCompletedRun) {
+    db.prepare(
+      "UPDATE steps SET output = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(output, step.id);
     return { advanced: false, runCompleted: false };
   }
 
@@ -1238,6 +1362,9 @@ function checkLoopContinuation(runId: string, loopStepId: string): { advanced: b
   ).get(runId) as { id: string } | undefined;
 
   if (failedStory) {
+    const loopStepMeta = db.prepare(
+      "SELECT step_id FROM steps WHERE id = ?"
+    ).get(loopStepId) as { step_id: string } | undefined;
     // Nothing pending, but failures remain — fail loop + run
     db.prepare(
       "UPDATE steps SET status = 'failed', output = ?, updated_at = datetime('now') WHERE id = ?"
@@ -1246,7 +1373,14 @@ function checkLoopContinuation(runId: string, loopStepId: string): { advanced: b
       "UPDATE runs SET status = 'failed', updated_at = datetime('now') WHERE id = ?"
     ).run(runId);
     const wfId = getWorkflowId(runId);
-    emitEvent({ ts: new Date().toISOString(), event: "step.failed", runId, workflowId: wfId, stepId: loopStepId, detail: "Loop has failed stories and no pending stories" });
+    emitEvent({
+      ts: new Date().toISOString(),
+      event: "step.failed",
+      runId,
+      workflowId: wfId,
+      stepId: loopStepMeta?.step_id ?? loopStepId,
+      detail: "Loop has failed stories and no pending stories",
+    });
     emitEvent({ ts: new Date().toISOString(), event: "run.failed", runId, workflowId: wfId, detail: "Loop has failed stories and no pending stories" });
     scheduleRunCronTeardown(runId);
     return { advanced: false, runCompleted: false };
@@ -1278,9 +1412,9 @@ function checkLoopContinuation(runId: string, loopStepId: string): { advanced: b
 function advancePipeline(runId: string): { advanced: boolean; runCompleted: boolean } {
   const db = getDb();
 
-  // Guard: don't advance or complete a run that's already failed/cancelled
+  // Guard: only running runs can advance.
   const runStatus = db.prepare("SELECT status FROM runs WHERE id = ?").get(runId) as { status: string } | undefined;
-  if (runStatus?.status === "failed" || runStatus?.status === "cancelled") {
+  if (runStatus?.status !== "running") {
     return { advanced: false, runCompleted: false };
   }
 

@@ -57,6 +57,32 @@ describe("computeHasFrontendChanges", () => {
     execSync("git add . && git commit -m 'add test'", { cwd: tmpDir });
     assert.equal(computeHasFrontendChanges(tmpDir, "feat-tests"), "false");
   });
+
+  it("falls back to master when main does not exist", () => {
+    execSync("git branch -m main master", { cwd: tmpDir });
+    execSync("git checkout -b feat-master-ui", { cwd: tmpDir });
+    fs.writeFileSync(path.join(tmpDir, "index.html"), "<html><body>master</body></html>");
+    execSync("git add . && git commit -m 'frontend on master base'", { cwd: tmpDir });
+    assert.equal(computeHasFrontendChanges(tmpDir, "feat-master-ui"), "true");
+  });
+
+  it("falls back to a single custom local base branch when defaults are absent", () => {
+    execSync("git branch -m main release", { cwd: tmpDir });
+    execSync("git checkout -b feat-release-ui", { cwd: tmpDir });
+    fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "src", "app.tsx"), "export const App = () => <div>release</div>;");
+    execSync("git add . && git commit -m 'frontend on release base'", { cwd: tmpDir });
+    assert.equal(computeHasFrontendChanges(tmpDir, "feat-release-ui"), "true");
+  });
+
+  it("accepts refs/heads branch inputs for custom-default repos", () => {
+    execSync("git branch -m main release", { cwd: tmpDir });
+    execSync("git checkout -b feat-release-ref-ui", { cwd: tmpDir });
+    fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "src", "ref-app.tsx"), "export const App = () => <main>ref</main>;");
+    execSync("git add . && git commit -m 'frontend on refs/heads branch input'", { cwd: tmpDir });
+    assert.equal(computeHasFrontendChanges(tmpDir, "refs/heads/feat-release-ref-ui"), "true");
+  });
 });
 
 describe("claimStep has_frontend_changes integration", () => {

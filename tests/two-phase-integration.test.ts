@@ -73,7 +73,8 @@ describe("two-phase-integration", () => {
   describe("work prompt has full execution instructions", () => {
     it("contains step complete with file-pipe pattern", () => {
       const prompt = buildWorkPrompt("feature-dev", "developer");
-      assert.ok(prompt.includes("shippulse-step-output.txt"), "file-pipe pattern");
+      assert.ok(prompt.includes("mktemp /tmp/shippulse-step-output.XXXXXX"), "file-pipe pattern");
+      assert.ok(!prompt.includes("mktemp /tmp/shippulse-step-output.XXXXXX.txt"), "portable mktemp template");
       assert.ok(prompt.includes("step complete"), "step complete command");
     });
 
@@ -91,7 +92,7 @@ describe("two-phase-integration", () => {
     it("contains all 3 rules", () => {
       const prompt = buildWorkPrompt("feature-dev", "developer");
       assert.ok(prompt.includes("NEVER end your session"));
-      assert.ok(prompt.includes("Write output to a file first"));
+      assert.ok(prompt.includes("Write output to a unique temp file first"));
       assert.ok(prompt.includes("step fail with an explanation"));
     });
 
