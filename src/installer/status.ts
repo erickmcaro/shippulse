@@ -51,6 +51,11 @@ function findRunByIdPrefix(query: string): RunInfo | undefined {
     .get(trimmed, trimmed) as RunInfo | undefined;
 }
 
+function isNumericRunNumberQuery(query: string): boolean {
+  const trimmed = query.trim();
+  return /^#?\d+$/.test(trimmed);
+}
+
 export function getWorkflowStatus(query: string): WorkflowStatusResult {
   const db = getDb();
   const trimmedQuery = query.trim();
@@ -60,6 +65,13 @@ export function getWorkflowStatus(query: string): WorkflowStatusResult {
   const runNumber = parseRunNumberQuery(trimmedQuery);
   if (runNumber !== null) {
     run = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(runNumber) as RunInfo | undefined;
+    if (!run && isNumericRunNumberQuery(trimmedQuery)) {
+      // Numeric queries are interpreted as run-number lookups only.
+      return {
+        status: "not_found",
+        message: notFoundMessage(query),
+      };
+    }
   }
 
   // Try exact task match, then substring match
@@ -147,6 +159,7 @@ function findRunByQuery(query: string): RunInfo | undefined {
   if (runNumber !== null) {
     const byNumber = db.prepare("SELECT * FROM runs WHERE run_number = ? LIMIT 1").get(runNumber) as RunInfo | undefined;
     if (byNumber) return byNumber;
+    if (isNumericRunNumberQuery(trimmedQuery)) return undefined;
   }
 
   let run = db.prepare("SELECT * FROM runs WHERE id = ?").get(trimmedQuery) as RunInfo | undefined;
