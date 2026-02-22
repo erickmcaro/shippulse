@@ -85,6 +85,7 @@ function migrate(db: DatabaseSync): void {
       step_index INTEGER NOT NULL,
       input_template TEXT NOT NULL,
       expects TEXT NOT NULL,
+      output_schema TEXT,
       status TEXT NOT NULL DEFAULT 'waiting',
       output TEXT,
       retry_count INTEGER DEFAULT 0,
@@ -125,6 +126,9 @@ function migrate(db: DatabaseSync): void {
   }
   if (!colNames.has("abandoned_count")) {
     db.exec("ALTER TABLE steps ADD COLUMN abandoned_count INTEGER DEFAULT 0");
+  }
+  if (!colNames.has("output_schema")) {
+    db.exec("ALTER TABLE steps ADD COLUMN output_schema TEXT");
   }
 
   // Add columns to runs table for backwards compat

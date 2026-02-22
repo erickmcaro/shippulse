@@ -53,11 +53,30 @@ export type LoopConfig = {
   verifyStep?: string;
 };
 
+export type OutputSchemaFieldType = "string" | "number" | "boolean" | "json";
+
+export type OutputSchemaField = {
+  type?: OutputSchemaFieldType;
+  enum?: Array<string | number | boolean>;
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+};
+
+export type StepOutputSchema = {
+  required?: string[];
+  additionalProperties?: boolean;
+  properties: Record<string, OutputSchemaField>;
+};
+
 export type WorkflowStep = {
   id: string;
   agent: string;
   type?: "single" | "loop";
   loop?: LoopConfig;
+  outputSchema?: StepOutputSchema;
   pollingTimeoutSeconds?: number;
   input: string;
   expects: string;

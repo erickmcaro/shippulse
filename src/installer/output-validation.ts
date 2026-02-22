@@ -1,3 +1,5 @@
+import type { StepOutputSchema } from "./types.js";
+
 type ValidationResult = {
   ok: boolean;
   normalized: Record<string, string>;
@@ -19,6 +21,129 @@ function stableNormalize(value: unknown): unknown {
 
 function stableStringify(value: unknown): string {
   return JSON.stringify(stableNormalize(value));
+}
+
+function parseBooleanToken(raw: string): boolean | null {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return null;
+}
+
+function validateStructuredOutput(
+  parsed: Record<string, string>,
+  schema: StepOutputSchema,
+): ValidationResult {
+  const errors: string[] = [];
+  const normalized: Record<string, string> = {};
+  const properties = Object.entries(schema.properties ?? {}).reduce<Record<string, StepOutputSchema["properties"][string]>>(
+    (acc, [rawKey, field]) => {
+      const key = rawKey.trim().toLowerCase();
+      if (key) acc[key] = field;
+      return acc;
+    },
+    {},
+  );
+  const required = (schema.required ?? []).map((k) => k.trim().toLowerCase()).filter(Boolean);
+  const additionalProperties = schema.additionalProperties !== false;
+
+  for (const key of required) {
+    if (parsed[key] === undefined) {
+      errors.push(`Output schema requires key "${key}".`);
+    }
+  }
+
+  for (const [key, rawValue] of Object.entries(parsed)) {
+    const field = properties[key];
+    if (!field) {
+      if (!additionalProperties) errors.push(`Output schema does not allow key "${key}".`);
+      continue;
+    }
+
+    const fieldType = field.type ?? "string";
+    if (fieldType === "string") {
+      if (field.minLength !== undefined && rawValue.length < field.minLength) {
+        errors.push(`Output schema key "${key}" must be at least ${field.minLength} characters.`);
+      }
+      if (field.maxLength !== undefined && rawValue.length > field.maxLength) {
+        errors.push(`Output schema key "${key}" must be at most ${field.maxLength} characters.`);
+      }
+      if (field.pattern) {
+        try {
+          const regex = new RegExp(field.pattern);
+          if (!regex.test(rawValue)) {
+            errors.push(`Output schema key "${key}" does not match required pattern.`);
+          }
+        } catch {
+          errors.push(`Output schema key "${key}" has invalid pattern.`);
+        }
+      }
+      if (field.enum && !field.enum.some((candidate) => String(candidate) === rawValue)) {
+        errors.push(`Output schema key "${key}" must be one of: ${field.enum.join(", ")}.`);
+      }
+      normalized[key] = rawValue;
+      continue;
+    }
+
+    if (fieldType === "number") {
+      const asNumber = Number(rawValue);
+      if (!Number.isFinite(asNumber)) {
+        errors.push(`Output schema key "${key}" must be a valid number.`);
+        continue;
+      }
+      if (field.minimum !== undefined && asNumber < field.minimum) {
+        errors.push(`Output schema key "${key}" must be >= ${field.minimum}.`);
+      }
+      if (field.maximum !== undefined && asNumber > field.maximum) {
+        errors.push(`Output schema key "${key}" must be <= ${field.maximum}.`);
+      }
+      if (
+        field.enum &&
+        !field.enum.some((candidate) => {
+          if (typeof candidate === "number") return candidate === asNumber;
+          return String(candidate) === String(asNumber);
+        })
+      ) {
+        errors.push(`Output schema key "${key}" must be one of: ${field.enum.join(", ")}.`);
+      }
+      normalized[key] = String(asNumber);
+      continue;
+    }
+
+    if (fieldType === "boolean") {
+      const asBoolean = parseBooleanToken(rawValue);
+      if (asBoolean === null) {
+        errors.push(`Output schema key "${key}" must be "true" or "false".`);
+        continue;
+      }
+      if (
+        field.enum &&
+        !field.enum.some((candidate) => {
+          if (typeof candidate === "boolean") return candidate === asBoolean;
+          if (typeof candidate === "string") return parseBooleanToken(candidate) === asBoolean;
+          return false;
+        })
+      ) {
+        errors.push(`Output schema key "${key}" must be one of: ${field.enum.join(", ")}.`);
+      }
+      normalized[key] = asBoolean ? "true" : "false";
+      continue;
+    }
+
+    // type=json
+    try {
+      const parsedJson = JSON.parse(rawValue);
+      normalized[key] = stableStringify(parsedJson);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`Output schema key "${key}" must be valid JSON: ${message}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, normalized: {}, errors };
+  }
+  return { ok: true, normalized, errors: [] };
 }
 
 function parseJsonValue(parsed: Record<string, string>, key: string, label: string, errors: string[]): unknown | null {
@@ -227,9 +352,23 @@ export function validateAndNormalizeStepOutput(
   workflowId: string | undefined,
   stepId: string,
   parsed: Record<string, string>,
+  outputSchema?: StepOutputSchema,
 ): ValidationResult {
   const normalized: Record<string, string> = {};
   const errors: string[] = [];
+  const parsedForValidation: Record<string, string> = { ...parsed };
+
+  if (outputSchema) {
+    const structuredValidation = validateStructuredOutput(parsedForValidation, outputSchema);
+    if (!structuredValidation.ok) {
+      errors.push(...structuredValidation.errors);
+    } else {
+      for (const [key, value] of Object.entries(structuredValidation.normalized)) {
+        normalized[key] = value;
+        parsedForValidation[key] = value;
+      }
+    }
+  }
 
   // Keep deterministic JSON formatting for known JSON output keys when present.
   const maybeJsonKeys = [
@@ -244,18 +383,19 @@ export function validateAndNormalizeStepOutput(
     "prioritized_gap_backlog_json",
   ];
   for (const key of maybeJsonKeys) {
-    if (parsed[key] === undefined) continue;
+    if (parsedForValidation[key] === undefined) continue;
     try {
-      normalized[key] = stableStringify(JSON.parse(parsed[key]));
+      normalized[key] = stableStringify(JSON.parse(parsedForValidation[key]));
+      parsedForValidation[key] = normalized[key];
     } catch {
       // Leave detailed errors to step-specific validation.
     }
   }
 
   if (workflowId === "product-planning" && stepId === "generate-epics") {
-    requireDoneStatus(parsed, errors);
-    const epicsRaw = parseJsonValue(parsed, "epics_json", "EPICS_JSON", errors);
-    const coverageRaw = parseJsonValue(parsed, "coverage_json", "COVERAGE_JSON", errors);
+    requireDoneStatus(parsedForValidation, errors);
+    const epicsRaw = parseJsonValue(parsedForValidation, "epics_json", "EPICS_JSON", errors);
+    const coverageRaw = parseJsonValue(parsedForValidation, "coverage_json", "COVERAGE_JSON", errors);
     const epics = ensureArray(epicsRaw, "EPICS_JSON", errors);
     validateEpics(epics, errors, { min: 4, max: 10 });
     if (coverageRaw && typeof coverageRaw !== "object") {
@@ -266,24 +406,24 @@ export function validateAndNormalizeStepOutput(
   }
 
   if (workflowId === "product-planning" && stepId === "generate-features") {
-    requireDoneStatus(parsed, errors);
-    const groupedRaw = parseJsonValue(parsed, "features_by_epic_json", "FEATURES_BY_EPIC_JSON", errors);
+    requireDoneStatus(parsedForValidation, errors);
+    const groupedRaw = parseJsonValue(parsedForValidation, "features_by_epic_json", "FEATURES_BY_EPIC_JSON", errors);
     const groups = ensureArray(groupedRaw, "FEATURES_BY_EPIC_JSON", errors);
     validateFeaturesByEpic(groups, errors);
     if (groups) normalized.features_by_epic_json = stableStringify(groups);
   }
 
   if (workflowId === "idea-to-project" && stepId === "ideate") {
-    requireDoneStatus(parsed, errors);
-    if (!isNonEmptyString(parsed.repo) || !parsed.repo.startsWith("/")) {
+    requireDoneStatus(parsedForValidation, errors);
+    if (!isNonEmptyString(parsedForValidation.repo) || !parsedForValidation.repo.startsWith("/")) {
       errors.push("REPO must be an absolute path.");
     }
-    if (!isNonEmptyString(parsed.branch)) {
+    if (!isNonEmptyString(parsedForValidation.branch)) {
       errors.push("BRANCH is required.");
     }
-    const epicsRaw = parseJsonValue(parsed, "epics_json", "EPICS_JSON", errors);
-    const featuresRaw = parseJsonValue(parsed, "features_json", "FEATURES_JSON", errors);
-    const storiesRaw = parseJsonValue(parsed, "stories_json", "STORIES_JSON", errors);
+    const epicsRaw = parseJsonValue(parsedForValidation, "epics_json", "EPICS_JSON", errors);
+    const featuresRaw = parseJsonValue(parsedForValidation, "features_json", "FEATURES_JSON", errors);
+    const storiesRaw = parseJsonValue(parsedForValidation, "stories_json", "STORIES_JSON", errors);
     const epics = ensureArray(epicsRaw, "EPICS_JSON", errors);
     const features = ensureArray(featuresRaw, "FEATURES_JSON", errors);
     const stories = ensureArray(storiesRaw, "STORIES_JSON", errors);
@@ -296,9 +436,9 @@ export function validateAndNormalizeStepOutput(
   }
 
   if (workflowId === "project-gap-analysis" && stepId === "generate-missing-epics") {
-    requireDoneStatus(parsed, errors);
-    const missingEpicsRaw = parseJsonValue(parsed, "missing_epics_json", "MISSING_EPICS_JSON", errors);
-    const coverageRaw = parseJsonValue(parsed, "epic_gap_coverage_json", "EPIC_GAP_COVERAGE_JSON", errors);
+    requireDoneStatus(parsedForValidation, errors);
+    const missingEpicsRaw = parseJsonValue(parsedForValidation, "missing_epics_json", "MISSING_EPICS_JSON", errors);
+    const coverageRaw = parseJsonValue(parsedForValidation, "epic_gap_coverage_json", "EPIC_GAP_COVERAGE_JSON", errors);
     const missingEpics = ensureArray(missingEpicsRaw, "MISSING_EPICS_JSON", errors);
     validateMissingEpics(missingEpics, errors);
     if (coverageRaw && typeof coverageRaw !== "object") {
@@ -311,9 +451,9 @@ export function validateAndNormalizeStepOutput(
   }
 
   if (workflowId === "project-gap-analysis" && stepId === "generate-missing-features") {
-    requireDoneStatus(parsed, errors);
+    requireDoneStatus(parsedForValidation, errors);
     const groupedRaw = parseJsonValue(
-      parsed,
+      parsedForValidation,
       "missing_features_by_epic_json",
       "MISSING_FEATURES_BY_EPIC_JSON",
       errors,

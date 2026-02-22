@@ -142,7 +142,7 @@ export async function runWorkflow(params: {
     }
 
     const insertStep = db.prepare(
-      "INSERT INTO steps (id, run_id, step_id, agent_id, step_index, input_template, expects, status, output, max_retries, type, loop_config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO steps (id, run_id, step_id, agent_id, step_index, input_template, expects, output_schema, status, output, max_retries, type, loop_config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
 
     for (let i = 0; i < workflow.steps.length; i++) {
@@ -162,7 +162,24 @@ export async function runWorkflow(params: {
       const maxRetries = step.max_retries ?? step.on_fail?.max_retries ?? 2;
       const stepType = step.type ?? "single";
       const loopConfig = step.loop ? JSON.stringify(step.loop) : null;
-      insertStep.run(stepUuid, runId, step.id, agentId, i, step.input, step.expects, status, output, maxRetries, stepType, loopConfig, now, now);
+      const outputSchema = step.outputSchema ? JSON.stringify(step.outputSchema) : null;
+      insertStep.run(
+        stepUuid,
+        runId,
+        step.id,
+        agentId,
+        i,
+        step.input,
+        step.expects,
+        outputSchema,
+        status,
+        output,
+        maxRetries,
+        stepType,
+        loopConfig,
+        now,
+        now,
+      );
     }
 
     db.exec("COMMIT");

@@ -1,5 +1,5 @@
 import { getDb } from "../db.js";
-import type { LoopConfig, Story } from "./types.js";
+import type { LoopConfig, StepOutputSchema, Story } from "./types.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -1098,7 +1098,7 @@ export function completeStep(stepId: string, output: string): { advanced: boolea
   const db = getDb();
 
   const step = db.prepare(
-    "SELECT id, run_id, step_id, step_index, status, type, loop_config, current_story_id FROM steps WHERE id = ?"
+    "SELECT id, run_id, step_id, step_index, status, type, loop_config, current_story_id, output_schema FROM steps WHERE id = ?"
   ).get(stepId) as {
     id: string;
     run_id: string;
@@ -1108,6 +1108,7 @@ export function completeStep(stepId: string, output: string): { advanced: boolea
     type: string;
     loop_config: string | null;
     current_story_id: string | null;
+    output_schema: string | null;
   } | undefined;
 
   if (!step) throw new Error(`Step not found: ${stepId}`);
@@ -1145,7 +1146,17 @@ export function completeStep(stepId: string, output: string): { advanced: boolea
   if (artifactsInOutput.stories) parsed.stories_json = JSON.stringify(artifactsInOutput.stories);
 
   const workflowId = getWorkflowId(step.run_id);
-  const validation = validateAndNormalizeStepOutput(workflowId, step.step_id, parsed);
+  let outputSchema: StepOutputSchema | undefined;
+  if (step.output_schema) {
+    try {
+      outputSchema = JSON.parse(step.output_schema) as StepOutputSchema;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failStep(step.id, `Invalid persisted output schema for "${step.step_id}": ${message}`);
+      return { advanced: false, runCompleted: false };
+    }
+  }
+  const validation = validateAndNormalizeStepOutput(workflowId, step.step_id, parsed, outputSchema);
   if (!validation.ok) {
     const error = `Output validation failed for "${step.step_id}": ${validation.errors.join(" | ")}`;
     failStep(step.id, error);
